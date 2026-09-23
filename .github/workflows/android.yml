@@ -16,15 +16,12 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      # Explicit modern packages only — do not request removed `tools`.
-      # compileSdk 34 (app/build.gradle); AGP 8.5.2 default build-tools is 34.0.0.
-      - uses: android-actions/setup-android@v3
+      # Single-line space-separated packages — multiline becomes one bogus arg to sdkmanager.
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
         with:
           accept-android-sdk-licenses: true
-          packages: |
-            platform-tools
-            platforms;android-34
-            build-tools;34.0.0
+          packages: platform-tools platforms;android-34 build-tools;34.0.0
 
       - name: Unit tests
         run: ./gradlew :app:testDebugUnitTest --stacktrace
