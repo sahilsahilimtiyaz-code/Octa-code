@@ -9,6 +9,7 @@ import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.Logging
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 
 // Single Ktor client: JSON content negotiation + redacting logger + sane timeouts.
@@ -17,6 +18,7 @@ import kotlinx.serialization.json.Json
 object KtorHttpFactory {
     fun create(): HttpClient = HttpClient(OkHttp) {
         install(ContentNegotiation) {
+            @OptIn(ExperimentalSerializationApi::class)
             json(Json { ignoreUnknownKeys = true; explicitNulls = false })
         }
         install(Logging) {

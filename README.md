@@ -26,13 +26,23 @@ Native Android AI coding workstation. No legacy, no stubs wired as real.
 - Capability badges: API / REMOTE / LOCAL / UNAVAILABLE
 - Settings screen wires keys, custom endpoint, autonomy picker to real registry
 
+### M3a Mission persistence (Room)
+- 16-phase `MissionPhase` model with autonomy-aware approval rules
+- Room schema v1: missions, phase runs, phase events, diffs (FK cascade)
+- `MissionRepository` contract + `RoomMissionRepository` (fail-loudly mappers)
+- Crash-recovery: `listRecoverable()` returns missions left RUNNING
+- Koin `dataModule` wired at app start (no orphans — M3b engine / M3d UI consume next)
+- Unit tests: phase matrix, repository contract (in-memory fake), detectors, redaction, net logic — **46 passing**
+
 ## Open in AndroidIDE / Android Studio
 1. Copy this folder into your projects directory.
 2. Open as existing Gradle project (AGP 8.5.2 + Kotlin 1.9.24).
 3. Run `app` on device (minSdk 26).
 
 ## Roadmap
-- M3 16-phase Mission Engine (observable, cancellable, persisted)
+- M3a Room schema / repository / tests — **done**
+- M3b Mission engine (observable, cancellable, persisted)
+- M3d Mission UI (Home hub expansion)
 - M4 Chat & Agent UI (streams from M2 adapters)
 - M5 Projects (index, editor, git, build, PTY terminal)
 - M6 Settings & credits polish

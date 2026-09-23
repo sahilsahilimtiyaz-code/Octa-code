@@ -5,7 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
@@ -30,7 +30,7 @@ private data class BottomDest(val route: String, val label: String, val icon: Im
 
 private val BOTTOM_DESTS = listOf(
     BottomDest(Routes.HOME, "Home", Icons.Filled.Home),
-    BottomDest(Routes.CHAT, "Agent", Icons.Filled.Chat),
+    BottomDest(Routes.CHAT, "Agent", Icons.AutoMirrored.Filled.Chat),
     BottomDest(Routes.PROJECTS, "Projects", Icons.Filled.Folder),
     BottomDest(Routes.TERMINAL, "Terminal", Icons.Filled.Terminal),
     BottomDest(Routes.SETTINGS, "Settings", Icons.Filled.Settings)
@@ -41,14 +41,15 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             OctaCodeTheme {
-                OctaApp()
+                OctaRoot()
             }
         }
     }
 }
 
+// Named OctaRoot (not OctaApp) — OctaApp is the Application class.
 @Composable
-fun OctaApp() {
+fun OctaRoot() {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route

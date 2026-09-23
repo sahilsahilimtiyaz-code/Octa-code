@@ -1,7 +1,6 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
-    id 'org.jetbrains.kotlin.plugin.compose'
     id 'org.jetbrains.kotlin.plugin.serialization'
     id 'org.jetbrains.kotlin.kapt'
 }
@@ -75,7 +74,7 @@ dependencies {
     // Coroutines
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1'
 
-    // Room (M5/M3 persistence — declared now, used in later milestones)
+    // Room (M3a mission persistence)
     implementation 'androidx.room:room-runtime:2.6.1'
     implementation 'androidx.room:room-ktx:2.6.1'
     kapt 'androidx.room:room-compiler:2.6.1'
@@ -83,13 +82,14 @@ dependencies {
     // M2 stack: Koin (DI) + Ktor (HTTP/SSE streaming)
     implementation 'io.insert-koin:koin-core:3.5.6'
     implementation 'io.insert-koin:koin-android:3.5.6'
-    implementation 'io.insert-koin:koin-compose:3.5.6'
+    implementation 'io.insert-koin:koin-androidx-compose:3.5.6'
     implementation 'io.ktor:ktor-client-core:2.3.12'
     implementation 'io.ktor:ktor-client-okhttp:2.3.12'
     implementation 'io.ktor:ktor-client-content-negotiation:2.3.12'
     implementation 'io.ktor:ktor-serialization-kotlinx-json:2.3.12'
     implementation 'io.ktor:ktor-client-logging:2.3.12'
-    implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3'
+    // 1.6.x is the line compatible with Kotlin 1.9.24 (1.7.x requires Kotlin 2.0)
+    implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3'
 
     // Encrypted credential storage (Android Keystore-backed)
     implementation 'androidx.security:security-crypto:1.1.0-alpha06'
@@ -97,4 +97,8 @@ dependencies {
     debugImplementation 'androidx.compose.ui:ui-tooling'
     debugImplementation 'androidx.compose.ui:ui-test-manifest'
     androidTestImplementation 'androidx.compose.ui:ui-test-junit4'
+
+    // M3a unit tests
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1'
 }
