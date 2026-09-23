@@ -1,24 +1,31 @@
 package com.sahil.octacode.ui.screens
 
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.GpsFixed
+import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -30,7 +37,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.sahil.octacode.core.capability.CapabilityRegistry
 import com.sahil.octacode.core.capability.ProviderStatus
 import com.sahil.octacode.core.provider.AiProvider
@@ -41,16 +54,24 @@ import com.sahil.octacode.core.provider.ChatRole
 import com.sahil.octacode.core.provider.ProviderId
 import com.sahil.octacode.data.security.CredentialStore
 import com.sahil.octacode.data.security.SecretRedactor
+import com.sahil.octacode.domain.chat.agentCardText
+import com.sahil.octacode.domain.chat.agentDotText
+import com.sahil.octacode.domain.chat.composerHelperText
 import com.sahil.octacode.domain.chat.historyWindow
+import com.sahil.octacode.domain.chat.modelSlotLabel
 import com.sahil.octacode.domain.mission.MissionEngine
+import com.sahil.octacode.ui.components.AgentComposer
+import com.sahil.octacode.ui.components.AgentHeader
 import com.sahil.octacode.ui.components.BannerTone
-import com.sahil.octacode.ui.components.CapabilityBadgeChip
 import com.sahil.octacode.ui.components.ChatBubble
 import com.sahil.octacode.ui.components.GlassPanel
+import com.sahil.octacode.ui.components.SessionStatusBar
 import com.sahil.octacode.ui.components.StatusBanner
 import com.sahil.octacode.ui.components.ThinkingOrb
+import com.sahil.octacode.ui.theme.GoldDeep
+import com.sahil.octacode.ui.theme.GoldLight
 import com.sahil.octacode.ui.theme.NeonBlue
-import com.sahil.octacode.ui.theme.NeonGreen
+import com.sahil.octacode.ui.theme.OnDark
 import com.sahil.octacode.ui.theme.OnDarkMuted
 import com.sahil.octacode.ui.theme.WarningAmber
 import kotlinx.coroutines.CancellationException
@@ -65,10 +86,15 @@ private const val CHAT_SYSTEM =
     "You are Octa Code, a concise mobile coding assistant. " +
         "Answer directly. Put code in ``` fences with a language tag."
 
-// M4a agent chat: real streaming via M2 adapters, no fake activity.
-// Unconfigured providers show Unavailable with reason + Settings hint.
+// M4b reference-style chat: header · session strip · hero + status cards
+// (empty) / bubbles (conversation) · composer. All states are real
+// (registry + engine); nothing is faked.
 @Composable
 fun ChatScreen(
+    onOpenSettings: () -> Unit,
+    onOpenProjects: () -> Unit,
+    onOpenMission: (String) -> Unit,
+    onNewMission: () -> Unit,
     engine: MissionEngine = koinInject(),
     registry: CapabilityRegistry = koinInject(),
     providers: Map<ProviderId, AiProvider> = koinInject(),
@@ -78,7 +104,6 @@ fun ChatScreen(
     var messages by remember { mutableStateOf<List<UiChat>>(emptyList()) }
     var input by remember { mutableStateOf("") }
     var providerId by remember { mutableStateOf(ProviderId.OPENAI) }
-    var providerMenu by remember { mutableStateOf(false) }
     var statuses by remember { mutableStateOf<Map<ProviderId, ProviderStatus>>(emptyMap()) }
     var error by remember { mutableStateOf<String?>(null) }
     var sending by remember { mutableStateOf(false) }
@@ -164,77 +189,73 @@ fun ChatScreen(
         }
     }
 
+    val st = statuses[providerId]
+    val ready = st is ProviderStatus.Ready
+    val card = agentCardText(providerId, st)
+    val (dotText, dotReady) = agentDotText(st)
+    val activeId = engineState.activeMissionId
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text("Agent", style = MaterialTheme.typography.headlineSmall)
-
-        if (engineState.activeMissionId != null) {
-            GlassPanel(title = "Active mission", accent = NeonBlue) {
-                Text(
-                    "Phase ${engineState.currentPhase?.index ?: "—"} · ${engineState.message.ifBlank { engineState.status.name }}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = OnDarkMuted
-                )
-                engineState.percent?.let { p ->
-                    Text(
-                        "~$p%",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = NeonGreen
-                    )
-                }
-            }
-        }
-
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            OutlinedButton(onClick = { providerMenu = true }, modifier = Modifier.weight(1f)) {
-                Text(providerId.title)
-            }
-            Spacer(Modifier.width(8.dp))
-            CapabilityBadgeChip(chatBadgeFor(providerId))
-            DropdownMenu(expanded = providerMenu, onDismissRequest = { providerMenu = false }) {
-                ProviderId.entries.forEach { id ->
-                    DropdownMenuItem(
-                        text = { Text(id.title) },
-                        onClick = {
-                            providerId = id
-                            providerMenu = false
-                            scope.launch { statuses = registry.refreshAll() }
-                        }
-                    )
-                }
-            }
-        }
-        val st = statuses[providerId]
-        Text(
-            when (st) {
-                null -> "Probing…"
-                is ProviderStatus.Ready -> "Ready — ${st.reason}"
-                is ProviderStatus.MissingKey -> "Unavailable — ${st.reason}. Set it in Settings."
-                is ProviderStatus.Misconfigured -> "Unavailable — ${st.reason}"
-                is ProviderStatus.Unavailable -> "Unavailable — ${st.reason}"
-            },
-            style = MaterialTheme.typography.bodySmall,
-            color = if (st is ProviderStatus.Ready) NeonGreen else WarningAmber
+        AgentHeader(
+            onOpenProjects = onOpenProjects,
+            onNewMission = onNewMission,
+            onOpenSettings = onOpenSettings
+        )
+        SessionStatusBar(
+            agentText = dotText,
+            agentReady = dotReady,
+            onPickProject = onOpenProjects
         )
 
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            if (messages.isEmpty()) {
-                item {
-                    Text(
-                        "Ask anything. Replies stream from the selected provider — nothing is faked.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = OnDarkMuted
-                    )
-                }
+        if (messages.isEmpty()) {
+            HeroBlock()
+            StatusCard(
+                title = card.title,
+                body = card.body,
+                ready = card.ready,
+                accent = WarningAmber,
+                onClick = onOpenSettings
+            )
+            if (activeId != null) {
+                val live = "Phase ${engineState.currentPhase?.index ?: "—"} · " +
+                    engineState.message.ifBlank { engineState.status.name } +
+                    (engineState.percent?.let { " (~$it%)" } ?: "")
+                StatusCard(
+                    title = "Mission activity",
+                    body = live,
+                    ready = true,
+                    accent = NeonBlue,
+                    onClick = { onOpenMission(activeId) }
+                )
             } else {
+                StatusCard(
+                    title = "Mission activity",
+                    body = "A mission feed appears after a real runtime starts work. " +
+                        "Nothing is running now.",
+                    ready = false,
+                    accent = NeonBlue,
+                    onClick = onNewMission
+                )
+            }
+        } else {
+            if (activeId != null) {
+                Text(
+                    "Mission phase ${engineState.currentPhase?.index ?: "—"} · " +
+                        engineState.message.ifBlank { engineState.status.name },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = OnDarkMuted
+                )
+            }
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 itemsIndexed(messages) { _, m ->
                     ChatBubble(role = m.role, text = m.text)
                 }
@@ -250,29 +271,143 @@ fun ChatScreen(
             StatusBanner(BannerTone.Error, "Chat failed", it)
         }
 
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.imePadding()
+        AgentComposer(
+            input = input,
+            onInput = { input = it },
+            providerId = providerId,
+            onSelectProvider = {
+                providerId = it
+                scope.launch { statuses = registry.refreshAll() }
+            },
+            modelLabel = modelSlotLabel(providerId, st),
+            modelBadge = chatBadgeFor(providerId),
+            onPickProject = onOpenProjects,
+            sending = sending,
+            canSend = !sending && input.isNotBlank() && ready,
+            helperText = composerHelperText(st),
+            onSend = ::send,
+            onStop = { streamJob?.cancel() }
+        )
+    }
+}
+
+@Composable
+private fun HeroBlock(modifier: Modifier = Modifier) {
+    Box(modifier = modifier.fillMaxWidth()) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(190.dp)
         ) {
-            OutlinedTextField(
-                value = input,
-                onValueChange = { input = it },
-                modifier = Modifier.weight(1f),
-                label = { Text("Message the agent…") },
-                singleLine = false,
-                maxLines = 4
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        NeonBlue.copy(alpha = 0.35f),
+                        Color.Transparent
+                    ),
+                    center = Offset(size.width * 0.92f, size.height * 0.45f),
+                    radius = size.width * 0.45f
+                ),
+                radius = size.width * 0.45f,
+                center = Offset(size.width * 0.92f, size.height * 0.45f)
             )
-            Spacer(Modifier.width(8.dp))
-            Column {
-                Button(onClick = ::send, enabled = !sending && input.isNotBlank()) {
-                    Text("Send")
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        WarningAmber.copy(alpha = 0.18f),
+                        Color.Transparent
+                    ),
+                    center = Offset(size.width * 0.7f, size.height * 0.7f),
+                    radius = size.width * 0.35f
+                ),
+                radius = size.width * 0.35f,
+                center = Offset(size.width * 0.7f, size.height * 0.7f)
+            )
+        }
+        Column(Modifier.padding(vertical = 8.dp)) {
+            Text(
+                text = "YOUR CODING PARTNER",
+                style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 2.sp),
+                color = OnDarkMuted
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "Build Better",
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.Bold,
+                color = OnDark
+            )
+            Text(
+                text = "Together",
+                style = MaterialTheme.typography.displaySmall.copy(
+                    brush = Brush.horizontalGradient(listOf(GoldLight, GoldDeep))
+                ),
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = "Your coding conversation and mission activity will appear here.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = OnDarkMuted,
+                modifier = Modifier.fillMaxWidth(0.75f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun StatusCard(
+    title: String,
+    body: String,
+    ready: Boolean,
+    accent: androidx.compose.ui.graphics.Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+    ) {
+        GlassPanel(accent = accent) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.Transparent)
+                        .border(1.dp, accent.copy(alpha = 0.6f), RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = when {
+                            ready && accent == NeonBlue -> Icons.Filled.GpsFixed
+                            ready -> Icons.Filled.CheckCircle
+                            else -> Icons.Filled.CloudOff
+                        },
+                        contentDescription = null,
+                        tint = accent,
+                        modifier = Modifier.size(22.dp)
+                    )
                 }
-                if (sending) {
-                    Spacer(Modifier.height(6.dp))
-                    OutlinedButton(onClick = { streamJob?.cancel() }) {
-                        Text("Stop")
-                    }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = OnDark
+                    )
+                    Text(
+                        text = body,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = OnDarkMuted
+                    )
                 }
+                Icon(
+                    Icons.Filled.KeyboardArrowRight,
+                    contentDescription = "Open",
+                    tint = OnDarkMuted
+                )
             }
         }
     }

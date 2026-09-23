@@ -32,7 +32,14 @@ fun OctaNavGraph(navController: NavHostController) {
                 onOpenMission = { id -> navController.navigate(Routes.missionDetail(id)) }
             )
         }
-        composable(Routes.CHAT) { ChatScreen() }
+        composable(Routes.CHAT) {
+            ChatScreen(
+                onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+                onOpenProjects = { navController.navigate(Routes.PROJECTS) },
+                onOpenMission = { id -> navController.navigate(Routes.missionDetail(id)) },
+                onNewMission = { navController.navigate(Routes.MISSION_LAUNCH) }
+            )
+        }
         composable(Routes.PROJECTS) { ProjectsScreen() }
         composable(Routes.TERMINAL) { TerminalScreen() }
         composable(Routes.SETTINGS) { SettingsScreen() }
