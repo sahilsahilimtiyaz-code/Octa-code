@@ -3,6 +3,7 @@ package com.sahil.octacode.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -164,7 +165,7 @@ fun AgentComposer(
                         disabledContentColor = OnDarkMuted
                     ),
                     modifier = Modifier.size(48.dp),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+                    contentPadding = PaddingValues(0.dp)
                 ) {
                     Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
                 }

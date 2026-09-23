@@ -18,7 +18,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudOff
@@ -213,34 +215,41 @@ fun ChatScreen(
         )
 
         if (messages.isEmpty()) {
-            HeroBlock()
-            StatusCard(
-                title = card.title,
-                body = card.body,
-                ready = card.ready,
-                accent = WarningAmber,
-                onClick = onOpenSettings
-            )
-            if (activeId != null) {
-                val live = "Phase ${engineState.currentPhase?.index ?: "—"} · " +
-                    engineState.message.ifBlank { engineState.status.name } +
-                    (engineState.percent?.let { " (~$it%)" } ?: "")
+            Column(
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                HeroBlock()
                 StatusCard(
-                    title = "Mission activity",
-                    body = live,
-                    ready = true,
-                    accent = NeonBlue,
-                    onClick = { onOpenMission(activeId) }
+                    title = card.title,
+                    body = card.body,
+                    ready = card.ready,
+                    accent = WarningAmber,
+                    onClick = onOpenSettings
                 )
-            } else {
-                StatusCard(
-                    title = "Mission activity",
-                    body = "A mission feed appears after a real runtime starts work. " +
-                        "Nothing is running now.",
-                    ready = false,
-                    accent = NeonBlue,
-                    onClick = onNewMission
-                )
+                if (activeId != null) {
+                    val live = "Phase ${engineState.currentPhase?.index ?: "—"} · " +
+                        engineState.message.ifBlank { engineState.status.name } +
+                        (engineState.percent?.let { " (~$it%)" } ?: "")
+                    StatusCard(
+                        title = "Mission activity",
+                        body = live,
+                        ready = true,
+                        accent = NeonBlue,
+                        onClick = { onOpenMission(activeId) }
+                    )
+                } else {
+                    StatusCard(
+                        title = "Mission activity",
+                        body = "A mission feed appears after a real runtime starts work. " +
+                            "Nothing is running now.",
+                        ready = false,
+                        accent = NeonBlue,
+                        onClick = onNewMission
+                    )
+                }
             }
         } else {
             if (activeId != null) {

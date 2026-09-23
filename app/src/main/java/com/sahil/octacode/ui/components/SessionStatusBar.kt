@@ -23,7 +23,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
-import com.sahil.octacode.ui.theme.NeonBlue
 import com.sahil.octacode.ui.theme.NeonGreen
 import com.sahil.octacode.ui.theme.OnDarkMuted
 import com.sahil.octacode.ui.theme.SurfaceDark
@@ -81,7 +80,7 @@ fun SessionStatusBar(
             modifier = Modifier
                 .size(8.dp)
                 .clip(CircleShape)
-                .background(if (agentReady) NeonGreen else NeonBlue.copy(alpha = 0.5f))
+                .background(if (agentReady) NeonGreen else WarningAmber.copy(alpha = 0.85f))
         )
         Spacer(Modifier.width(6.dp))
         Text(
