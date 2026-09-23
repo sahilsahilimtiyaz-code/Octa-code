@@ -71,6 +71,7 @@ import com.sahil.octacode.ui.components.StatusBanner
 import com.sahil.octacode.ui.components.ThinkingOrb
 import com.sahil.octacode.ui.components.goldEdge
 import com.sahil.octacode.ui.components.tealEdge
+import com.sahil.octacode.ui.theme.ChatCardTop
 import com.sahil.octacode.ui.theme.ChatMuted
 import com.sahil.octacode.ui.theme.ChatPageBg
 import com.sahil.octacode.ui.theme.GoldDeep
