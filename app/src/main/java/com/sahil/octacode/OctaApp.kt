@@ -1,0 +1,16 @@
+package com.sahil.octacode
+
+import android.app.Application
+import com.sahil.octacode.di.appModule
+import org.koin.android.ext.koin.androidContext
+import org.koin.core.context.startKoin
+
+class OctaApp : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        startKoin {
+            androidContext(this@OctaApp)
+            modules(appModule)
+        }
+    }
+}

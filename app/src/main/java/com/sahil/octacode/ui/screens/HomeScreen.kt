@@ -23,9 +23,13 @@ fun HomeScreen(onOpenChat: () -> Unit) {
     ) {
         Text("Octa Code", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.height(8.dp))
-        Text("Mobile AI Coding Agent — M0 scaffold", style = MaterialTheme.typography.bodyMedium)
+        Text("Mobile AI Coding Agent — M1 + M2", style = MaterialTheme.typography.bodyMedium)
         Spacer(Modifier.height(16.dp))
-        Text("Capability registry, providers, missions land in M1–M3.", style = MaterialTheme.typography.bodySmall)
+        Text(
+            "Capability registry + OpenAI/Custom adapters live in Settings. " +
+                "Missions land in M3.",
+            style = MaterialTheme.typography.bodySmall
+        )
         Spacer(Modifier.height(16.dp))
         Button(onClick = onOpenChat) { Text("Open Agent Chat") }
     }

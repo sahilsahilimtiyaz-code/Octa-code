@@ -2,6 +2,7 @@ plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
     id 'org.jetbrains.kotlin.plugin.compose'
+    id 'org.jetbrains.kotlin.plugin.serialization'
     id 'org.jetbrains.kotlin.kapt'
 }
 
@@ -79,9 +80,19 @@ dependencies {
     implementation 'androidx.room:room-ktx:2.6.1'
     kapt 'androidx.room:room-compiler:2.6.1'
 
-    // HTTP (M2 provider adapters)
-    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    // M2 stack: Koin (DI) + Ktor (HTTP/SSE streaming)
+    implementation 'io.insert-koin:koin-core:3.5.6'
+    implementation 'io.insert-koin:koin-android:3.5.6'
+    implementation 'io.insert-koin:koin-compose:3.5.6'
+    implementation 'io.ktor:ktor-client-core:2.3.12'
+    implementation 'io.ktor:ktor-client-okhttp:2.3.12'
+    implementation 'io.ktor:ktor-client-content-negotiation:2.3.12'
+    implementation 'io.ktor:ktor-serialization-kotlinx-json:2.3.12'
+    implementation 'io.ktor:ktor-client-logging:2.3.12'
     implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3'
+
+    // Encrypted credential storage (Android Keystore-backed)
+    implementation 'androidx.security:security-crypto:1.1.0-alpha06'
 
     debugImplementation 'androidx.compose.ui:ui-tooling'
     debugImplementation 'androidx.compose.ui:ui-test-manifest'
