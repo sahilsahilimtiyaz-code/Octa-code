@@ -29,6 +29,12 @@ val TextMuted = Color(0xFF6E6E85)
 val GlassBorder = Color(0xFF7A7AFF)
 val GlassShadow = Color(0xFF00D4FF)
 
+// Gold / champagne accents (Agent reference chrome)
+val Gold = Color(0xFFC9A96A)
+val GoldBright = Color(0xFFE8C98A)
+val GoldDeep = Color(0xFF8A7340)
+val GoldText = Color(0xFFD4B978)
+
 // Starfield gradient ends
 val DeepPurpleTop = Color(0xFF14082A)
 val DeepBlueBottom = Color(0xFF04081A)

@@ -76,7 +76,17 @@ Native Android AI coding workstation. No legacy, no stubs wired as real.
 - Koin: `chatModule` → `ChatEngine` singleton; Claude/Gemini remain honestly Unavailable
 - Shared `defaultModelFor(ProviderId)` used by chat + mission implement phase
 - Unit tests: ready-gate, delta accumulation, stream error, stop/partial, empty draft, provider switch — **94 passing**
-1. Copy this folder into your projects directory.
+
+### M4.1 Agent chrome (reference match)
+- Gold/champagne accent tokens (`Gold`, `GoldBright`, `GoldDeep`, `GoldText`) alongside brand neon
+- `AgentChrome` kit: glass top bar + hex logo, status pill, hero planet, accent info cards, composer pills, gold send/stop
+- Chat empty state: “Build Better / Together” hero + Agent unavailable / Mission activity cards
+- Live conversation reuses `ChatBubble` + real `ChatEngine` (unchanged)
+- Bottom bar: gold active pill for Workspace / Agent / Code / Terminal / Settings
+- Nav: menu/profile → Settings, project pill/cards → Projects
+- **94 unit tests still passing** (`:app:testDebugUnitTest`)
+
+## Setup
 2. Open as existing Gradle project (AGP 8.5.2 + Kotlin 1.9.24).
 3. Run `app` on device (minSdk 26).
 
