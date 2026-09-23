@@ -71,7 +71,7 @@ fun AgentComposer(
 ) {
     var modelMenu by remember { mutableStateOf(false) }
 
-    GlowCard(edge = tealEdge(), modifier = modifier.imePadding()) {
+    GlowCard(edge = tealEdge(), modifier = modifier.imePadding(), contentPadding = 12.dp) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
@@ -80,7 +80,7 @@ fun AgentComposer(
                     .background(DeepSpaceBlack.copy(alpha = 0.45f))
                     .border(1.dp, ChatMuted.copy(alpha = 0.25f), RoundedCornerShape(10.dp))
                     .clickable { modelMenu = true }
-                    .padding(horizontal = 10.dp, vertical = 8.dp)
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
@@ -120,7 +120,7 @@ fun AgentComposer(
                     .background(DeepSpaceBlack.copy(alpha = 0.45f))
                     .border(1.dp, ChatMuted.copy(alpha = 0.25f), RoundedCornerShape(10.dp))
                     .clickable(onClick = onPickProject)
-                    .padding(horizontal = 10.dp, vertical = 8.dp)
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
@@ -145,7 +145,7 @@ fun AgentComposer(
                 }
             }
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(6.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = {}, enabled = false) {
                 Icon(
@@ -179,14 +179,14 @@ fun AgentComposer(
                 onValueChange = onInput,
                 modifier = Modifier.weight(1f),
                 placeholder = { Text("Type a message…", color = ChatMuted) },
-                maxLines = 4
+                singleLine = true
             )
             Spacer(Modifier.width(8.dp))
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 if (canSend) {
                     Box(
                         modifier = Modifier
-                            .size(48.dp)
+                            .size(44.dp)
                             .clip(CircleShape)
                             .background(
                                 Brush.linearGradient(listOf(GoldBright, GoldDeep))
@@ -210,7 +210,7 @@ fun AgentComposer(
                             disabledContainerColor = ChatMuted.copy(alpha = 0.22f),
                             disabledContentColor = ChatMuted.copy(alpha = 0.6f)
                         ),
-                        modifier = Modifier.size(48.dp),
+                        modifier = Modifier.size(44.dp),
                         contentPadding = PaddingValues(0.dp)
                     ) {
                         Icon(
@@ -231,6 +231,7 @@ fun AgentComposer(
             text = helperText,
             style = MaterialTheme.typography.labelSmall,
             color = ChatMuted,
+            maxLines = 1,
             modifier = Modifier.padding(top = 4.dp)
         )
     }
