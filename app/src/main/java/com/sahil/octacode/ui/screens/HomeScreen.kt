@@ -53,14 +53,14 @@ fun HomeScreen(
     ) {
         Text("Octa Code", style = MaterialTheme.typography.headlineLarge, color = NeonBlue)
         Text(
-            "Mobile AI Coding Agent — M3b Mission Engine",
+            "Mobile AI Coding Agent — M3c full 16-phase pipeline",
             style = MaterialTheme.typography.bodyMedium,
             color = OnDarkMuted
         )
 
         GlassPanel(title = "Mission hub", accent = NeonGreen) {
             Text(
-                "16-phase pipeline · handlers 1–6 live · phases 7+ pause for M3c (honest stop).",
+                "16-phase pipeline · implement → review → verify · honest skips + snapshot rollback.",
                 style = MaterialTheme.typography.bodySmall,
                 color = OnDarkMuted
             )

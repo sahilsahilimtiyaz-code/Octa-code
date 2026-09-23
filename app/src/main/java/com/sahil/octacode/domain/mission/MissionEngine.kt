@@ -41,7 +41,14 @@ sealed interface PhaseOutcome {
     ) : PhaseOutcome
 
     data class Failed(val reason: String, val retryable: Boolean = true) : PhaseOutcome
-    data class AwaitingApproval(val payload: CheckpointPayload) : PhaseOutcome
+    data class AwaitingApproval(
+        val payload: CheckpointPayload,
+        val onApproved: (suspend () -> String)? = null,
+        val onRejected: (suspend () -> Unit)? = null
+    ) : PhaseOutcome
+
+    /** Honest skip for maySkip phases (no toolchain, healthy rollback, …). */
+    data class Skipped(val reason: String) : PhaseOutcome
 }
 
 /** Runtime passed into each phase handler (pure domain — no Android types). */
@@ -51,24 +58,30 @@ data class PhaseContext(
     val registry: CapabilityRegistry,
     val providers: Map<ProviderId, AiProvider>,
     val priorSummaries: Map<MissionPhase, String>,
+    val repository: MissionRepository,
+    val snapshots: SnapshotStore,
+    val processRunner: ProcessRunner,
     val emitProgress: suspend (String) -> Unit
 )
 
-/** Contract for one pipeline phase. M3b ships handlers for indices 1–6 only. */
+/** Contract for one pipeline phase. M3c ships handlers for indices 1–16. */
 interface PhaseHandler {
     val phase: MissionPhase
     suspend fun execute(context: PhaseContext): PhaseOutcome
 }
 
 /**
- * M3b mission engine — observable, cancellable, persisted.
- * Runs phase handlers 1–6; pauses honestly at phase 7+ until M3c.
+ * M3c mission engine — observable, cancellable, persisted.
+ * Runs the full 16-phase pipeline; auto-rolls back snapshots when a phase
+ * fails after implement.
  */
 class MissionEngine(
     private val repository: MissionRepository,
     private val registry: CapabilityRegistry,
     private val providers: Map<ProviderId, AiProvider>,
     private val handlers: Map<MissionPhase, PhaseHandler> = defaultPhaseHandlers(),
+    private val snapshots: SnapshotStore = InMemorySnapshotStore(),
+    private val processRunner: ProcessRunner = ProcessRunner.Unavailable,
     private val clock: () -> Long = System::currentTimeMillis,
     scope: CoroutineScope? = null
 ) {
@@ -276,37 +289,17 @@ class MissionEngine(
 
                 val handler = handlers[phase]
                 if (handler == null) {
-                    val reason =
-                        "Phase ${phase.index} (${phase.title}) arrives in M3c — M3b stops after planning checkpoint."
-                    repository.updateMission(
-                        mission.copy(
-                            status = MissionStatus.PAUSED,
-                            failureReason = reason,
-                            updatedAt = clock()
-                        )
-                    )
-                    emitEvent(
-                        missionId, phase, EventKind.MISSION_PAUSED,
-                        Json.encodeToString(
-                            PhaseFailurePayload.serializer(),
-                            PhaseFailurePayload(reason, retryable = false)
-                        )
-                    )
-                    _state.value = _state.value.copy(
-                        status = MissionStatus.PAUSED,
-                        busy = false,
-                        awaitingApproval = false,
-                        message = reason,
-                        lastError = null,
-                        currentPhase = phase,
-                        percent = ((phase.index - 1) * 100) / MissionPhase.TOTAL
-                    )
+                    failPhase(mission, phase, "No handler registered for ${phase.name}", retryable = false)
+                    failMission(mission, "No handler registered for phase ${phase.index}", retryable = false)
                     return
                 }
 
                 beginPhase(mission, phase)
                 val prior = repository.getPhaseRuns(missionId)
-                    .filter { it.status == PhaseStatus.SUCCEEDED && it.phase != phase }
+                    .filter {
+                        (it.status == PhaseStatus.SUCCEEDED || it.status == PhaseStatus.SKIPPED) &&
+                            it.phase != phase
+                    }
                     .associate { it.phase to (it.outputSummary ?: "") }
 
                 val outcome = try {
@@ -317,6 +310,9 @@ class MissionEngine(
                             registry = registry,
                             providers = providers,
                             priorSummaries = prior,
+                            repository = repository,
+                            snapshots = snapshots,
+                            processRunner = processRunner,
                             emitProgress = { msg ->
                                 emitEvent(missionId, phase, EventKind.PHASE_PROGRESS, progressJson(msg))
                                 _state.value = _state.value.copy(message = msg)
@@ -327,6 +323,9 @@ class MissionEngine(
                     throw t
                 } catch (t: Throwable) {
                     failPhase(mission, phase, t.message ?: t::class.java.simpleName, retryable = false)
+                    if (phase.index >= MissionPhase.IMPLEMENT.index) {
+                        performAutoRollback(mission)
+                    }
                     failMission(mission, t.message ?: "Handler crashed", retryable = false)
                     return
                 }
@@ -334,29 +333,24 @@ class MissionEngine(
                 when (outcome) {
                     is PhaseOutcome.Succeeded -> {
                         succeedPhase(mission, phase, outcome.summary)
-                        val next = phase.next()
-                        if (next == null) {
-                            completeMission(missionId, phase)
+                        if (!advanceAfterPhase(missionId, phase, outcome.patchMission)) return
+                    }
+
+                    is PhaseOutcome.Skipped -> {
+                        if (!phase.maySkip) {
+                            failPhase(mission, phase, "Illegal skip: ${outcome.reason}", retryable = false)
+                            failMission(mission, "Phase ${phase.name} cannot be skipped", retryable = false)
                             return
                         }
-                        val latest = repository.getMission(missionId) ?: return
-                        val patched = outcome.patchMission?.let { latest.it() } ?: latest
-                        repository.updateMission(
-                            patched.copy(
-                                currentPhase = next,
-                                updatedAt = clock(),
-                                status = MissionStatus.RUNNING
-                            )
-                        )
-                        _state.value = _state.value.copy(
-                            currentPhase = next,
-                            percent = ((next.index - 1) * 100) / MissionPhase.TOTAL,
-                            phaseStatuses = _state.value.phaseStatuses + (phase to PhaseStatus.SUCCEEDED)
-                        )
+                        skipPhase(mission, phase, outcome.reason)
+                        if (!advanceAfterPhase(missionId, phase, null)) return
                     }
 
                     is PhaseOutcome.Failed -> {
                         failPhase(mission, phase, outcome.reason, outcome.retryable)
+                        if (phase.index >= MissionPhase.IMPLEMENT.index) {
+                            performAutoRollback(mission)
+                        }
                         failMission(mission, outcome.reason, outcome.retryable)
                         return
                     }
@@ -382,34 +376,39 @@ class MissionEngine(
                         val ok = deferred.await()
                         approval = null
                         if (!ok) {
+                            try {
+                                outcome.onRejected?.invoke()
+                            } catch (_: Throwable) {
+                                // reject side-effects are best-effort; mission still fails
+                            }
                             emitEvent(missionId, phase, EventKind.CHECKPOINT_REJECTED, """{"reason":"rejected"}""")
                             failPhase(mission, phase, "Checkpoint rejected by user", retryable = false)
+                            if (phase.index >= MissionPhase.IMPLEMENT.index) {
+                                performAutoRollback(mission)
+                            }
                             failMission(mission, "Checkpoint rejected by user", retryable = false)
+                            return
+                        }
+                        val approvedSummary = try {
+                            outcome.onApproved?.invoke() ?: "Checkpoint approved"
+                        } catch (t: CancellationException) {
+                            throw t
+                        } catch (t: Throwable) {
+                            failPhase(mission, phase, t.message ?: "Approval side-effect failed", retryable = false)
+                            if (phase.index >= MissionPhase.IMPLEMENT.index) {
+                                performAutoRollback(mission)
+                            }
+                            failMission(mission, t.message ?: "Approval side-effect failed", retryable = false)
                             return
                         }
                         emitEvent(missionId, phase, EventKind.CHECKPOINT_APPROVED, """{"reason":"approved"}""")
                         val approved = repository.getMission(missionId) ?: return
-                        succeedPhase(approved, phase, "Checkpoint approved")
-                        val next = phase.next()
-                        if (next == null) {
-                            completeMission(missionId, phase)
-                            return
-                        }
-                        repository.updateMission(
-                            approved.copy(
-                                status = MissionStatus.RUNNING,
-                                currentPhase = next,
-                                failureReason = null,
-                                updatedAt = clock()
-                            )
-                        )
+                        succeedPhase(approved, phase, approvedSummary)
+                        if (!advanceAfterPhase(missionId, phase, null)) return
                         _state.value = _state.value.copy(
                             status = MissionStatus.RUNNING,
                             awaitingApproval = false,
                             busy = true,
-                            currentPhase = next,
-                            percent = ((next.index - 1) * 100) / MissionPhase.TOTAL,
-                            phaseStatuses = _state.value.phaseStatuses + (phase to PhaseStatus.SUCCEEDED),
                             message = "Running…"
                         )
                     }
@@ -481,6 +480,111 @@ class MissionEngine(
             phaseStatuses = _state.value.phaseStatuses + (phase to PhaseStatus.RUNNING),
             lastError = null
         )
+    }
+
+    /** Advance currentPhase after success/skip/approve. Returns false when mission completed/stopped. */
+    private suspend fun advanceAfterPhase(
+        missionId: String,
+        phase: MissionPhase,
+        patchMission: (Mission.() -> Mission)?
+    ): Boolean {
+        val next = phase.next()
+        if (next == null) {
+            completeMission(missionId, phase)
+            return false
+        }
+        val latest = repository.getMission(missionId) ?: return false
+        val patched = patchMission?.let { latest.it() } ?: latest
+        repository.updateMission(
+            patched.copy(
+                currentPhase = next,
+                updatedAt = clock(),
+                status = MissionStatus.RUNNING,
+                failureReason = null
+            )
+        )
+        _state.value = _state.value.copy(
+            currentPhase = next,
+            percent = ((next.index - 1) * 100) / MissionPhase.TOTAL,
+            phaseStatuses = _state.value.phaseStatuses + (phase to
+                (_state.value.phaseStatuses[phase] ?: PhaseStatus.SUCCEEDED))
+        )
+        return true
+    }
+
+    private suspend fun skipPhase(mission: Mission, phase: MissionPhase, reason: String) {
+        val now = clock()
+        val existing = repository.getPhaseRuns(mission.id).firstOrNull { it.phase == phase }
+        repository.upsertPhaseRun(
+            PhaseRun(
+                id = existing?.id ?: 0,
+                missionId = mission.id,
+                phase = phase,
+                status = PhaseStatus.SKIPPED,
+                startedAt = existing?.startedAt ?: now,
+                endedAt = now,
+                outputSummary = reason,
+                errorReason = null
+            )
+        )
+        emitEvent(mission.id, phase, EventKind.PHASE_SKIPPED, progressJson(reason))
+        _state.value = _state.value.copy(
+            phaseStatuses = _state.value.phaseStatuses + (phase to PhaseStatus.SKIPPED),
+            message = reason
+        )
+    }
+
+    /**
+     * After implement, any failure restores the app-private snapshot and
+     * records ROLLBACK_PERFORMED (spec: rollback if failed).
+     */
+    private suspend fun performAutoRollback(mission: Mission) {
+        try {
+            val missionId = mission.id
+            if (!snapshots.hasSnapshot(missionId)) return
+            val root = java.io.File(mission.projectPath)
+            if (!root.isDirectory) return
+            val result = snapshots.restore(missionId, root)
+            if (result.total == 0) return
+            val reason = "Restored ${result.restored}, removed ${result.deletedCreated} created file(s)"
+            val existing = repository.getPhaseRuns(missionId).firstOrNull {
+                it.phase == MissionPhase.ROLLBACK
+            }
+            repository.upsertPhaseRun(
+                PhaseRun(
+                    id = existing?.id ?: 0,
+                    missionId = missionId,
+                    phase = MissionPhase.ROLLBACK,
+                    status = PhaseStatus.SUCCEEDED,
+                    startedAt = existing?.startedAt ?: clock(),
+                    endedAt = clock(),
+                    outputSummary = "Auto-rollback: $reason",
+                    errorReason = null
+                )
+            )
+            emitEvent(
+                missionId,
+                MissionPhase.ROLLBACK,
+                EventKind.ROLLBACK_PERFORMED,
+                progressJson(reason)
+            )
+            _state.value = _state.value.copy(
+                message = "Rollback: $reason",
+                phaseStatuses = _state.value.phaseStatuses +
+                    (MissionPhase.ROLLBACK to PhaseStatus.SUCCEEDED)
+            )
+        } catch (t: Throwable) {
+            try {
+                emitEvent(
+                    mission.id,
+                    MissionPhase.ROLLBACK,
+                    EventKind.ROLLBACK_PERFORMED,
+                    progressJson("Rollback failed: ${t.message}")
+                )
+            } catch (_: Throwable) {
+                // persistence already failing — avoid masking original error
+            }
+        }
     }
 
     private suspend fun succeedPhase(mission: Mission, phase: MissionPhase, summary: String) {

@@ -21,15 +21,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.sahil.octacode.domain.mission.DiffDecision
 import com.sahil.octacode.domain.mission.EventKind
-import com.sahil.octacode.domain.mission.MissionDiff
 import com.sahil.octacode.domain.mission.MissionEngine
+import com.sahil.octacode.domain.mission.MissionPhase
 import com.sahil.octacode.domain.mission.MissionRepository
 import com.sahil.octacode.domain.mission.MissionStatus
 import com.sahil.octacode.ui.components.BannerTone
@@ -47,7 +47,7 @@ import com.sahil.octacode.ui.theme.WarningAmber
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
-// M3b MissionDetail: engine state + phase rail + stream + checkpoint controls.
+// M3c MissionDetail: engine state + phase rail + stream + checkpoint + live diffs.
 @Composable
 fun MissionDetailScreen(
     missionId: String,
@@ -60,12 +60,7 @@ fun MissionDetailScreen(
     val mission by repository.observeMission(missionId).collectAsState(initial = null)
     val runs by repository.observePhaseRuns(missionId).collectAsState(initial = emptyList())
     val events by repository.observeEvents(missionId).collectAsState(initial = emptyList())
-    val diffs by androidx.compose.runtime.produceState<List<MissionDiff>>(
-        initialValue = emptyList(),
-        key1 = missionId
-    ) {
-        value = repository.getDiffs(missionId)
-    }
+    val diffs by repository.observeDiffs(missionId).collectAsState(initial = emptyList())
 
     LaunchedEffect(missionId) {
         engine.hydrateFromRepository(missionId)
@@ -128,9 +123,22 @@ fun MissionDetailScreen(
         }
 
         if (engineState.awaitingApproval) {
-            GlassPanel(title = "User checkpoint", accent = WarningAmber) {
+            GlassPanel(title = "Approval required", accent = WarningAmber) {
+                val phaseTitle = currentPhase?.title ?: "checkpoint"
+                val msg = when (currentPhase) {
+                    MissionPhase.USER_CHECKPOINT ->
+                        "Approve to continue past the planning checkpoint. Reject fails the mission."
+                    MissionPhase.REVIEW_DIFF ->
+                        "Approve to accept pending file diffs. Reject fails the mission and rolls back writes."
+                    MissionPhase.BUILD ->
+                        "Approve to run the project build. Reject fails the mission."
+                    MissionPhase.INSTALL ->
+                        "Approve to install the APK via adb. Reject fails the mission."
+                    else ->
+                        "Approve to continue past $phaseTitle. Reject fails the mission with reason."
+                }
                 Text(
-                    "Approve to continue past phase 6. Reject fails the mission with reason.",
+                    msg,
                     style = MaterialTheme.typography.bodySmall,
                     color = OnDarkMuted
                 )
@@ -189,23 +197,34 @@ fun MissionDetailScreen(
 
         if (diffs.isEmpty()) {
             Text(
-                "No diffs yet — file writes arrive with phase 7+ (M3c).",
+                "No diffs yet — file writes appear after Implement.",
                 style = MaterialTheme.typography.labelSmall,
                 color = OnDarkMuted
             )
         } else {
             Text("Diffs", style = MaterialTheme.typography.titleMedium)
             diffs.forEach { d ->
-                DiffCard(diff = d)
+                DiffCard(
+                    diff = d,
+                    onAccept = {
+                        scope.launch { repository.updateDiffDecision(d.id, DiffDecision.ACCEPTED) }
+                    },
+                    onReject = {
+                        scope.launch { repository.updateDiffDecision(d.id, DiffDecision.REJECTED) }
+                    }
+                )
             }
         }
 
-        if (status == MissionStatus.PAUSED && failure != null && failure.contains("M3c")) {
+        if (repoHasRollback(events)) {
             StatusBanner(
-                tone = BannerTone.Info,
-                title = "M3b complete through checkpoint",
-                message = failure
+                tone = BannerTone.Warning,
+                title = "Rollback performed",
+                message = "Snapshot restored after failure — files reverted to pre-implement state."
             )
         }
     }
 }
+
+private fun repoHasRollback(events: List<com.sahil.octacode.domain.mission.PhaseEvent>): Boolean =
+    events.any { it.kind == EventKind.ROLLBACK_PERFORMED }

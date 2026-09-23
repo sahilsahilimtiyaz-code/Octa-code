@@ -29,6 +29,7 @@ interface MissionRepository {
 
     suspend fun upsertDiff(diff: MissionDiff)
     suspend fun getDiffs(missionId: String): List<MissionDiff>
+    fun observeDiffs(missionId: String): Flow<List<MissionDiff>>
     suspend fun updateDiffDecision(diffId: Long, decision: DiffDecision)
 
     /** Wipe a mission and children (user delete). */

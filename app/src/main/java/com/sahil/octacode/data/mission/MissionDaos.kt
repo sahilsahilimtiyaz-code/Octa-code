@@ -77,6 +77,9 @@ interface MissionDiffDao {
     @Query("SELECT * FROM mission_diffs WHERE missionId = :missionId ORDER BY id ASC")
     suspend fun getForMission(missionId: String): List<MissionDiffEntity>
 
+    @Query("SELECT * FROM mission_diffs WHERE missionId = :missionId ORDER BY id ASC")
+    fun observeForMission(missionId: String): Flow<List<MissionDiffEntity>>
+
     @Query("UPDATE mission_diffs SET decision = :decision WHERE id = :id")
     suspend fun updateDecision(id: Long, decision: String)
 

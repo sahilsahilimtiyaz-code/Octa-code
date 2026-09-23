@@ -91,6 +91,9 @@ private class FakeMissionRepository : com.sahil.octacode.domain.mission.MissionR
     override suspend fun getDiffs(missionId: String): List<MissionDiff> =
         diffs.value.filter { it.missionId == missionId }
 
+    override fun observeDiffs(missionId: String): Flow<List<MissionDiff>> =
+        diffs.map { list -> list.filter { it.missionId == missionId } }
+
     override suspend fun updateDiffDecision(diffId: Long, decision: DiffDecision) {
         diffs.update { list ->
             list.map { if (it.id == diffId) it.copy(decision = decision) else it }

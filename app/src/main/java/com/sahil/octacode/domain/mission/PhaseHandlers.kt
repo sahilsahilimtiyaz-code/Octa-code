@@ -159,12 +159,14 @@ private object UserCheckpointHandler : PhaseHandler {
     }
 }
 
-/** M3b handler map — only phases 1–6. Engine pauses honestly at 7+. */
-fun defaultPhaseHandlers(): Map<MissionPhase, PhaseHandler> = listOf(
-    UnderstandTaskHandler,
-    DetectProjectHandler,
-    SelectTeamHandler,
-    SelectProviderHandler,
-    PlanApproachHandler,
-    UserCheckpointHandler
+/** Full pipeline handlers — phases 1–6 (M3b) + 7–16 (M3c). */
+fun defaultPhaseHandlers(): Map<MissionPhase, PhaseHandler> = (
+    listOf(
+        UnderstandTaskHandler,
+        DetectProjectHandler,
+        SelectTeamHandler,
+        SelectProviderHandler,
+        PlanApproachHandler,
+        UserCheckpointHandler
+    ) + m3cPhaseHandlers()
 ).associateBy { it.phase }

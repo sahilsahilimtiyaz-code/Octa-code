@@ -36,7 +36,6 @@ import com.sahil.octacode.core.capability.ProjectTypeDetector
 import com.sahil.octacode.core.capability.ProviderStatus
 import com.sahil.octacode.core.provider.ProviderId
 import com.sahil.octacode.domain.mission.MissionEngine
-import com.sahil.octacode.domain.mission.MissionRepository
 import com.sahil.octacode.ui.components.GlassPanel
 import com.sahil.octacode.ui.components.StatusBanner
 import com.sahil.octacode.ui.components.BannerTone
@@ -55,8 +54,7 @@ fun MissionLaunchScreen(
     onBack: () -> Unit,
     onStarted: (String) -> Unit,
     engine: MissionEngine = koinInject(),
-    registry: CapabilityRegistry = koinInject(),
-    repository: MissionRepository = koinInject()
+    registry: CapabilityRegistry = koinInject()
 ) {
     val scope = rememberCoroutineScope()
     var goal by remember { mutableStateOf("") }
@@ -201,11 +199,11 @@ fun MissionLaunchScreen(
             enabled = !busy,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text(if (busy) "Starting…" else "Start mission (phases 1–6)")
+            Text(if (busy) "Starting…" else "Start mission (16 phases)")
         }
 
         Text(
-            "M3b runs Understand → Detect → Team → Provider → Plan → Checkpoint, then pauses for M3c (no fake implement).",
+            "Runs Understand → … → Complete. Implement needs a Ready provider; format/test/build skip honestly when tools are missing.",
             style = MaterialTheme.typography.labelSmall,
             color = OnDarkMuted
         )

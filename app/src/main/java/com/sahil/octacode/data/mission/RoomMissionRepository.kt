@@ -73,6 +73,9 @@ class RoomMissionRepository(
     override suspend fun getDiffs(missionId: String): List<MissionDiff> =
         missionDiffDao.getForMission(missionId).map { it.toDomain() }
 
+    override fun observeDiffs(missionId: String): Flow<List<MissionDiff>> =
+        missionDiffDao.observeForMission(missionId).map { list -> list.map { it.toDomain() } }
+
     override suspend fun updateDiffDecision(diffId: Long, decision: DiffDecision) {
         missionDiffDao.updateDecision(diffId, decision.name)
     }

@@ -32,18 +32,29 @@ Native Android AI coding workstation. No legacy, no stubs wired as real.
 - `MissionRepository` contract + `RoomMissionRepository` (fail-loudly mappers)
 - Crash-recovery: `listRecoverable()` returns missions left RUNNING
 - Koin `dataModule` wired at app start (no orphans — M3b engine / M3d UI consume next)
-- Unit tests: phase matrix, repository contract (in-memory fake), detectors, redaction, net logic — **46 passing**
+- Unit tests: phase matrix, repository contract (in-memory fake), detectors, redaction, net logic, full 16-phase pipeline — **85 passing**
 
 ### M3b Mission engine + UI kit + screens
 - `MissionEngine` — observable (`StateFlow`), cancellable, Room-persisted; resumes via `listRecoverable()`
-- Phase handlers **1–6 only** (Understand → Detect → Team → Provider → Plan → Checkpoint); no orphan stubs
-- Honesty stop at phase 7: mission **PAUSED** with reason *“arrives in M3c”* (never fakes implement)
+- Phase handlers **1–6** (Understand → Detect → Team → Provider → Plan → Checkpoint)
 - Checkpoint gated by autonomy: ASK/BALANCED wait for Approve/Reject; HIGH auto-approves
 - Provider selection always records **real** registry status (MissingKey/Unavailable pass through)
 - UI kit: `PhaseRail`, `ThinkingOrb`, `StreamTerminal`, `DiffCard`, `StatusBanner`, `GlassPanel`
 - Screens: **MissionLaunch** (goal/path/provider) + **MissionDetail** (rail, stream, checkpoint, pause/cancel/resume)
 - Home hub: New Mission, recoverable resume, recent list; bottom bar hides on `mission/*` routes
 - Koin: `engineModule` → `MissionEngine` singleton
+
+### M3c Implement / diff / rollback (phases 7–16)
+- Full handler map **1–16** — no honesty stop at phase 7
+- **Implement**: Ready-provider gate → streamed `OCTA_EDIT` full-file replacements → path safety → app-private snapshot → Room diffs (before/after SHA-256 + redacted patch)
+- **Review diff**: HIGH auto-accepts; other autonomies pause for Approve/Reject; reject fails mission + auto-rollback
+- **Format / Analyze impact / Test / Build / Install**: real `ProcessRunner` when tools exist; otherwise `SKIPPED` with reason (never fake success). BUILD/INSTALL honor autonomy approval gates
+- **Verify**: file hashes must match recorded `afterHash` (or created-file existence)
+- **Rollback**: healthy path skips with “snapshot kept”; any failure after implement restores snapshot and emits `ROLLBACK_PERFORMED`
+- **Complete**: closes mission with accepted-change summary
+- Koin: `FileSnapshotStore` (filesDir/mission_snapshots) + `JvmProcessRunner`
+- MissionDetail: live diff observe, Accept/Reject wired, phase-aware approval copy, rollback banner
+- Unit tests: full pipeline happy path, review gate, unsafe paths, no-edit fail, auto-rollback on test fail
 
 ## Open in AndroidIDE / Android Studio
 1. Copy this folder into your projects directory.
@@ -53,7 +64,7 @@ Native Android AI coding workstation. No legacy, no stubs wired as real.
 ## Roadmap
 - M3a Room schema / repository / tests — **done**
 - M3b Mission engine + UI kit + Launch/Detail — **done**
-- M3c Implement/diff/rollback handlers (phases 7–16)
+- M3c Implement/diff/rollback handlers (phases 7–16) — **done**
 - M3d Deeper mission UX polish
 - M4 Chat & Agent UI (streams from M2 adapters)
 - M5 Projects (index, editor, git, build, PTY terminal)
