@@ -32,7 +32,7 @@ Native Android AI coding workstation. No legacy, no stubs wired as real.
 - `MissionRepository` contract + `RoomMissionRepository` (fail-loudly mappers)
 - Crash-recovery: `listRecoverable()` returns missions left RUNNING
 - Koin `dataModule` wired at app start (no orphans — M3b engine / M3d UI consume next)
-- Unit tests: phase matrix, repository contract (in-memory fake), detectors, redaction, net logic, full 16-phase pipeline — **85 passing**
+- Unit tests: phase matrix, repository contract, detectors, redaction, net logic, full pipeline — **85 passing**
 
 ### M3b Mission engine + UI kit + screens
 - `MissionEngine` — observable (`StateFlow`), cancellable, Room-persisted; resumes via `listRecoverable()`
