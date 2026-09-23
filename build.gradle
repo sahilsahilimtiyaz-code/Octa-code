@@ -1,5 +1,5 @@
 // Top-level build file for Octa Code - Mobile AI Coding Agent
-// Package: com.sahil.octacode | v1.0.0 (M0 scaffold + M1/M2 + M3a mission persistence)
+// Package: com.sahil.octacode | v1.0.0 (M0 + M1/M2 + M3a persistence + M3b engine/UI)
 plugins {
     id 'com.android.application' version '8.5.2' apply false
     id 'org.jetbrains.kotlin.android' version '1.9.24' apply false

@@ -1,7 +1,7 @@
 package com.sahil.octacode.ui.navigation
 
 // M0: single source of truth for destinations.
-// Milestones M1-M6 add nested graphs here (mission detail, editor, diff, provider config).
+// M3b adds mission launch + parameterized mission detail.
 object Routes {
     const val SPLASH = "splash"
     const val HOME = "home"
@@ -9,4 +9,13 @@ object Routes {
     const val PROJECTS = "projects"
     const val TERMINAL = "terminal"
     const val SETTINGS = "settings"
+
+    const val MISSION_LAUNCH = "mission/launch"
+    const val MISSION_DETAIL_PATTERN = "mission/{missionId}"
+    const val ARG_MISSION_ID = "missionId"
+
+    fun missionDetail(missionId: String): String = "mission/$missionId"
+
+    fun isMissionRoute(route: String?): Boolean =
+        route != null && route.startsWith("mission/")
 }

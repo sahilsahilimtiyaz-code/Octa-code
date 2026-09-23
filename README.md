@@ -34,6 +34,17 @@ Native Android AI coding workstation. No legacy, no stubs wired as real.
 - Koin `dataModule` wired at app start (no orphans — M3b engine / M3d UI consume next)
 - Unit tests: phase matrix, repository contract (in-memory fake), detectors, redaction, net logic — **46 passing**
 
+### M3b Mission engine + UI kit + screens
+- `MissionEngine` — observable (`StateFlow`), cancellable, Room-persisted; resumes via `listRecoverable()`
+- Phase handlers **1–6 only** (Understand → Detect → Team → Provider → Plan → Checkpoint); no orphan stubs
+- Honesty stop at phase 7: mission **PAUSED** with reason *“arrives in M3c”* (never fakes implement)
+- Checkpoint gated by autonomy: ASK/BALANCED wait for Approve/Reject; HIGH auto-approves
+- Provider selection always records **real** registry status (MissingKey/Unavailable pass through)
+- UI kit: `PhaseRail`, `ThinkingOrb`, `StreamTerminal`, `DiffCard`, `StatusBanner`, `GlassPanel`
+- Screens: **MissionLaunch** (goal/path/provider) + **MissionDetail** (rail, stream, checkpoint, pause/cancel/resume)
+- Home hub: New Mission, recoverable resume, recent list; bottom bar hides on `mission/*` routes
+- Koin: `engineModule` → `MissionEngine` singleton
+
 ## Open in AndroidIDE / Android Studio
 1. Copy this folder into your projects directory.
 2. Open as existing Gradle project (AGP 8.5.2 + Kotlin 1.9.24).
@@ -41,8 +52,9 @@ Native Android AI coding workstation. No legacy, no stubs wired as real.
 
 ## Roadmap
 - M3a Room schema / repository / tests — **done**
-- M3b Mission engine (observable, cancellable, persisted)
-- M3d Mission UI (Home hub expansion)
+- M3b Mission engine + UI kit + Launch/Detail — **done**
+- M3c Implement/diff/rollback handlers (phases 7–16)
+- M3d Deeper mission UX polish
 - M4 Chat & Agent UI (streams from M2 adapters)
 - M5 Projects (index, editor, git, build, PTY terminal)
 - M6 Settings & credits polish

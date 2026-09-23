@@ -55,7 +55,7 @@ fun OctaRoot() {
     val currentRoute = navBackStackEntry?.destination?.route
     Scaffold(
         bottomBar = {
-            if (currentRoute != Routes.SPLASH) {
+            if (currentRoute != Routes.SPLASH && !Routes.isMissionRoute(currentRoute)) {
                 NavigationBar {
                     val currentDestination = navBackStackEntry?.destination
                     BOTTOM_DESTS.forEach { dest ->

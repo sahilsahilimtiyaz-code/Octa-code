@@ -3,6 +3,7 @@ package com.sahil.octacode
 import android.app.Application
 import com.sahil.octacode.di.appModule
 import com.sahil.octacode.di.dataModule
+import com.sahil.octacode.di.engineModule
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.context.startKoin
 
@@ -11,7 +12,7 @@ class OctaApp : Application() {
         super.onCreate()
         startKoin {
             androidContext(this@OctaApp)
-            modules(appModule, dataModule)
+            modules(appModule, dataModule, engineModule)
         }
     }
 }
