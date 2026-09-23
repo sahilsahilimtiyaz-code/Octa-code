@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -34,8 +35,10 @@ import androidx.compose.ui.unit.dp
 import com.sahil.octacode.core.capability.CapabilityRegistry
 import com.sahil.octacode.core.capability.ProjectTypeDetector
 import com.sahil.octacode.core.capability.ProviderStatus
+import com.sahil.octacode.core.provider.CapabilityBadge
 import com.sahil.octacode.core.provider.ProviderId
 import com.sahil.octacode.domain.mission.MissionEngine
+import com.sahil.octacode.ui.components.CapabilityBadgeChip
 import com.sahil.octacode.ui.components.GlassPanel
 import com.sahil.octacode.ui.components.StatusBanner
 import com.sahil.octacode.ui.components.BannerTone
@@ -125,6 +128,8 @@ fun MissionLaunchScreen(
                 OutlinedButton(onClick = { providerMenu = true }, modifier = Modifier.weight(1f)) {
                     Text(providerId.title)
                 }
+                Spacer(Modifier.width(8.dp))
+                CapabilityBadgeChip(badgeFor(providerId))
                 DropdownMenu(expanded = providerMenu, onDismissRequest = { providerMenu = false }) {
                     ProviderId.entries.forEach { id ->
                         DropdownMenuItem(
@@ -157,7 +162,12 @@ fun MissionLaunchScreen(
                 color = OnDarkMuted
             )
             Text(
-                "USER_CHECKPOINT approval is gated by this level.",
+                when (autonomy.name) {
+                    "ASK" -> "ASK: pauses at plan, review, build and install for approval."
+                    "BALANCED" -> "BALANCED: pauses at plan and install; auto-continues elsewhere."
+                    "GUIDED" -> "GUIDED: pauses at install only."
+                    else -> "HIGH_AUTONOMY: auto-approves checkpoints; review still recorded."
+                },
                 style = MaterialTheme.typography.labelSmall,
                 color = OnDarkMuted
             )
@@ -208,4 +218,10 @@ fun MissionLaunchScreen(
             color = OnDarkMuted
         )
     }
+}
+
+private fun badgeFor(id: ProviderId): CapabilityBadge = when (id) {
+    ProviderId.OPENAI -> CapabilityBadge.API
+    ProviderId.CUSTOM -> CapabilityBadge.REMOTE
+    ProviderId.CLAUDE, ProviderId.GEMINI -> CapabilityBadge.UNAVAILABLE
 }

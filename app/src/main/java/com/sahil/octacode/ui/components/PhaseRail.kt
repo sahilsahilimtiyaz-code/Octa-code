@@ -1,6 +1,7 @@
 package com.sahil.octacode.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,10 +34,12 @@ import com.sahil.octacode.ui.theme.SurfaceVariantDark
 import com.sahil.octacode.ui.theme.WarningAmber
 
 // M3b UI kit: vertical 16-phase rail with honest status colors.
+// M3d: current-row accent border + optional per-phase error line.
 @Composable
 fun PhaseRail(
     currentPhase: MissionPhase?,
     statuses: Map<MissionPhase, PhaseStatus>,
+    errors: Map<MissionPhase, String?> = emptyMap(),
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -49,7 +52,8 @@ fun PhaseRail(
             PhaseRailRow(
                 phase = phase,
                 status = st,
-                isCurrent = isCurrent
+                isCurrent = isCurrent,
+                error = errors[phase]
             )
         }
     }
@@ -59,7 +63,8 @@ fun PhaseRail(
 private fun PhaseRailRow(
     phase: MissionPhase,
     status: PhaseStatus?,
-    isCurrent: Boolean
+    isCurrent: Boolean,
+    error: String? = null
 ) {
     val dotColor: Color = when (status) {
         PhaseStatus.SUCCEEDED -> NeonGreen
@@ -82,6 +87,13 @@ private fun PhaseRailRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
             .background(if (isCurrent) SurfaceVariantDark.copy(alpha = 0.7f) else Color.Transparent)
+            .then(
+                if (isCurrent) Modifier.border(
+                    1.dp,
+                    NeonBlue.copy(alpha = 0.5f),
+                    RoundedCornerShape(8.dp)
+                ) else Modifier
+            )
             .padding(horizontal = 6.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -110,6 +122,15 @@ private fun PhaseRailRow(
             style = MaterialTheme.typography.labelSmall,
             fontFamily = FontFamily.Monospace,
             color = titleColor
+        )
+    }
+    if ((status == PhaseStatus.FAILED) && !error.isNullOrBlank()) {
+        Text(
+            text = error.take(180),
+            style = MaterialTheme.typography.labelSmall,
+            fontFamily = FontFamily.Monospace,
+            color = NeonRed.copy(alpha = 0.9f),
+            modifier = Modifier.padding(start = 28.dp, end = 6.dp, bottom = 2.dp)
         )
     }
 }

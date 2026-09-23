@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -29,9 +30,11 @@ import com.sahil.octacode.ui.theme.NeonBlue
 import com.sahil.octacode.ui.theme.OnDarkMuted
 
 // M3b UI kit: pulsing "thinking" orb while the engine is busy.
+// M3d: optional percent + 3-bar typing indicator (spec M4 preview).
 @Composable
 fun ThinkingOrb(
     label: String = "Working",
+    percent: Int? = null,
     modifier: Modifier = Modifier
 ) {
     val transition = rememberInfiniteTransition(label = "orb")
@@ -75,10 +78,28 @@ fun ThinkingOrb(
                 )
         )
         Text(
-            text = label,
+            text = if (percent != null) "$label • $percent%" else label,
             style = MaterialTheme.typography.labelMedium,
             color = OnDarkMuted,
             modifier = Modifier.padding(top = 8.dp)
         )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(top = 6.dp)
+        ) {
+            repeat(3) { i ->
+                val barAlpha = when (i) {
+                    0 -> alpha
+                    1 -> (alpha * 0.75f).coerceIn(0f, 1f)
+                    else -> (alpha * 0.5f).coerceIn(0f, 1f)
+                }
+                Box(
+                    modifier = Modifier
+                        .size(width = 22.dp, height = 5.dp)
+                        .clip(CircleShape)
+                        .background(NeonBlue.copy(alpha = barAlpha))
+                )
+            }
+        }
     }
 }

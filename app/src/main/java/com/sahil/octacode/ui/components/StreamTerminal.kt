@@ -22,6 +22,7 @@ import com.sahil.octacode.ui.theme.OnDarkMuted
 import com.sahil.octacode.ui.theme.SurfaceDark
 
 // M3b UI kit: monospace event / stream terminal with auto-scroll.
+// M3d: safe scrollToItem (no animate crash on rapid events), bounded height.
 @Composable
 fun StreamTerminal(
     lines: List<String>,
@@ -30,7 +31,13 @@ fun StreamTerminal(
 ) {
     val listState = rememberLazyListState()
     LaunchedEffect(lines.size) {
-        if (lines.isNotEmpty()) listState.animateScrollToItem(lines.lastIndex)
+        if (lines.isNotEmpty()) {
+            try {
+                listState.scrollToItem(lines.lastIndex)
+            } catch (_: Exception) {
+                // rapid inserts during fast phases — next frame will catch up
+            }
+        }
     }
 
     Column(modifier = modifier.fillMaxWidth()) {

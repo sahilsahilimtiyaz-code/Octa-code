@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -14,6 +15,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -24,6 +26,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.sahil.octacode.domain.mission.DiffDecision
@@ -40,6 +44,7 @@ import com.sahil.octacode.ui.components.StatusBanner
 import com.sahil.octacode.ui.components.StreamTerminal
 import com.sahil.octacode.ui.components.ThinkingOrb
 import com.sahil.octacode.ui.components.bannerToneFor
+import com.sahil.octacode.ui.components.formatEventLine
 import com.sahil.octacode.ui.theme.NeonBlue
 import com.sahil.octacode.ui.theme.NeonGreen
 import com.sahil.octacode.ui.theme.OnDarkMuted
@@ -115,11 +120,30 @@ fun MissionDetailScreen(
                     fontFamily = FontFamily.Monospace,
                     color = NeonGreen
                 )
+                Spacer(Modifier.height(6.dp))
+                LinearProgressIndicator(
+                    progress = p.coerceIn(0, 100) / 100f,
+                    modifier = Modifier
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp)),
+                    color = NeonGreen,
+                    trackColor = OnDarkMuted.copy(alpha = 0.25f)
+                )
             }
         }
 
         if (engineState.busy && !engineState.awaitingApproval) {
-            ThinkingOrb(label = engineState.message.ifBlank { "Working" })
+            GlassPanel(accent = NeonBlue) {
+                ThinkingOrb(
+                    label = engineState.message.ifBlank { "Working" },
+                    percent = engineState.percent
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { engine.cancel() },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Stop mission") }
+            }
         }
 
         if (engineState.awaitingApproval) {
@@ -177,21 +201,16 @@ fun MissionDetailScreen(
         }
 
         GlassPanel(title = "Phases", accent = NeonGreen) {
-            PhaseRail(currentPhase = currentPhase, statuses = phaseStatuses)
+            val phaseErrors = runs.associate { it.phase to it.errorReason }
+            PhaseRail(
+                currentPhase = currentPhase,
+                statuses = phaseStatuses,
+                errors = phaseErrors
+            )
         }
 
         GlassPanel(title = "Event stream", accent = NeonBlue) {
-            val lines = events.map { e ->
-                val phaseTag = "%02d".format(e.phase.index)
-                val msg = when (e.kind) {
-                    EventKind.PHASE_PROGRESS,
-                    EventKind.PHASE_SUCCEEDED,
-                    EventKind.PHASE_FAILED,
-                    EventKind.CHECKPOINT_REQUIRED -> e.payloadJson
-                    else -> e.kind.name
-                }
-                "[$phaseTag] ${e.kind.name}: $msg"
-            }
+            val lines = events.map { e -> formatEventLine(e) }
             StreamTerminal(lines = lines)
         }
 

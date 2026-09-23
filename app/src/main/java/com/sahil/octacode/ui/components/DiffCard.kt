@@ -16,6 +16,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
@@ -29,6 +33,7 @@ import com.sahil.octacode.ui.theme.SurfaceVariantDark
 import com.sahil.octacode.ui.theme.WarningAmber
 
 // M3b UI kit: review card for a mission file diff.
+// M3d: collapsible patch + +/- line colors, keeps Accept/Reject wiring.
 @Composable
 fun DiffCard(
     diff: MissionDiff,
@@ -41,6 +46,12 @@ fun DiffCard(
         DiffDecision.ACCEPTED -> NeonGreen
         DiffDecision.REJECTED -> NeonRed
     }
+    var expanded by remember(diff.id) { mutableStateOf(false) }
+    val rawLines = remember(diff.patchText) {
+        diff.patchText.ifBlank { "(empty patch)" }.lines()
+    }
+    val visibleLines = if (expanded) rawLines.take(400) else rawLines.take(30)
+    val hiddenCount = rawLines.size - visibleLines.size
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -75,15 +86,36 @@ fun DiffCard(
                 color = OnDarkMuted
             )
             Spacer(Modifier.height(8.dp))
-            Text(
-                text = diff.patchText.ifBlank { "(empty patch)" },
-                style = MaterialTheme.typography.bodySmall,
-                fontFamily = FontFamily.Monospace,
-                color = MaterialTheme.colorScheme.onSurface,
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(6.dp)
-            )
+                    .padding(6.dp),
+                verticalArrangement = Arrangement.spacedBy(1.dp)
+            ) {
+                visibleLines.forEach { line ->
+                    val color = when {
+                        line.startsWith("+") && !line.startsWith("+++") -> NeonGreen
+                        line.startsWith("-") && !line.startsWith("---") -> NeonRed
+                        line.startsWith("@@") -> NeonBlue
+                        else -> MaterialTheme.colorScheme.onSurface
+                    }
+                    Text(
+                        text = line.ifBlank { " " },
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = color
+                    )
+                }
+                if (hiddenCount > 0 || rawLines.size > 30) {
+                    TextButton(onClick = { expanded = !expanded }) {
+                        Text(
+                            if (expanded) "Collapse"
+                            else "Expand +$hiddenCount lines",
+                            color = NeonBlue
+                        )
+                    }
+                }
+            }
             if (diff.decision == DiffDecision.PENDING && onAccept != null && onReject != null) {
                 Spacer(Modifier.height(8.dp))
                 Row {
