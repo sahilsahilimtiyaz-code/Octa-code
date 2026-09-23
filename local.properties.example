@@ -1,0 +1,2 @@
+# Add your Android SDK path when building locally. Do NOT commit secrets.
+# sdk.dir=/storage/emulated/0/Android/Sdk

@@ -1,0 +1,8 @@
+// Top-level build file for Octa Code - Mobile AI Coding Agent
+// Package: com.sahil.octacode | v1.0.0 (M0 scaffold)
+plugins {
+    id 'com.android.application' version '8.5.2' apply false
+    id 'org.jetbrains.kotlin.android' version '1.9.24' apply false
+    id 'com.google.dagger.hilt.android' version '2.52' apply false
+    id 'org.jetbrains.kotlin.plugin.compose' version '1.9.24' apply false
+}
