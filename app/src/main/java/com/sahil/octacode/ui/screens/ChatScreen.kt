@@ -49,7 +49,6 @@ import androidx.compose.ui.unit.sp
 import com.sahil.octacode.core.capability.CapabilityRegistry
 import com.sahil.octacode.core.capability.ProviderStatus
 import com.sahil.octacode.core.provider.AiProvider
-import com.sahil.octacode.core.provider.CapabilityBadge
 import com.sahil.octacode.core.provider.ChatMessage
 import com.sahil.octacode.core.provider.ChatRequest
 import com.sahil.octacode.core.provider.ChatRole
@@ -66,15 +65,18 @@ import com.sahil.octacode.ui.components.AgentComposer
 import com.sahil.octacode.ui.components.AgentHeader
 import com.sahil.octacode.ui.components.BannerTone
 import com.sahil.octacode.ui.components.ChatBubble
-import com.sahil.octacode.ui.components.GlassPanel
+import com.sahil.octacode.ui.components.GlowCard
 import com.sahil.octacode.ui.components.SessionStatusBar
 import com.sahil.octacode.ui.components.StatusBanner
 import com.sahil.octacode.ui.components.ThinkingOrb
+import com.sahil.octacode.ui.components.goldEdge
+import com.sahil.octacode.ui.components.tealEdge
+import com.sahil.octacode.ui.theme.ChatMuted
+import com.sahil.octacode.ui.theme.ChatPageBg
 import com.sahil.octacode.ui.theme.GoldDeep
 import com.sahil.octacode.ui.theme.GoldLight
 import com.sahil.octacode.ui.theme.NeonBlue
 import com.sahil.octacode.ui.theme.OnDark
-import com.sahil.octacode.ui.theme.OnDarkMuted
 import com.sahil.octacode.ui.theme.WarningAmber
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -197,6 +199,11 @@ fun ChatScreen(
     val (dotText, dotReady) = agentDotText(st)
     val activeId = engineState.activeMissionId
 
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(ChatPageBg)
+    ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -257,7 +264,7 @@ fun ChatScreen(
                     "Mission phase ${engineState.currentPhase?.index ?: "—"} · " +
                         engineState.message.ifBlank { engineState.status.name },
                     style = MaterialTheme.typography.labelSmall,
-                    color = OnDarkMuted
+                    color = ChatMuted
                 )
             }
             LazyColumn(
@@ -289,7 +296,6 @@ fun ChatScreen(
                 scope.launch { statuses = registry.refreshAll() }
             },
             modelLabel = modelSlotLabel(providerId, st),
-            modelBadge = chatBadgeFor(providerId),
             onPickProject = onOpenProjects,
             sending = sending,
             canSend = !sending && input.isNotBlank() && ready,
@@ -297,6 +303,7 @@ fun ChatScreen(
             onSend = ::send,
             onStop = { streamJob?.cancel() }
         )
+    }
     }
 }
 
@@ -337,7 +344,7 @@ private fun HeroBlock(modifier: Modifier = Modifier) {
             Text(
                 text = "YOUR CODING PARTNER",
                 style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 2.sp),
-                color = OnDarkMuted
+                color = ChatMuted
             )
             Spacer(Modifier.height(4.dp))
             Text(
@@ -357,7 +364,7 @@ private fun HeroBlock(modifier: Modifier = Modifier) {
             Text(
                 text = "Your coding conversation and mission activity will appear here.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = OnDarkMuted,
+                color = ChatMuted,
                 modifier = Modifier.fillMaxWidth(0.75f)
             )
         }
@@ -378,13 +385,13 @@ private fun StatusCard(
             .fillMaxWidth()
             .clickable(onClick = onClick)
     ) {
-        GlassPanel(accent = accent) {
+        GlowCard(edge = if (accent == WarningAmber) goldEdge() else tealEdge()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
                         .size(44.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(Color.Transparent)
+                        .background(ChatCardTop)
                         .border(1.dp, accent.copy(alpha = 0.6f), RoundedCornerShape(12.dp)),
                     contentAlignment = Alignment.Center
                 ) {
@@ -409,21 +416,15 @@ private fun StatusCard(
                     Text(
                         text = body,
                         style = MaterialTheme.typography.bodySmall,
-                        color = OnDarkMuted
+                        color = ChatMuted
                     )
                 }
                 Icon(
                     Icons.Filled.KeyboardArrowRight,
                     contentDescription = "Open",
-                    tint = OnDarkMuted
+                    tint = ChatMuted
                 )
             }
         }
     }
-}
-
-private fun chatBadgeFor(id: ProviderId): CapabilityBadge = when (id) {
-    ProviderId.OPENAI -> CapabilityBadge.API
-    ProviderId.CUSTOM -> CapabilityBadge.REMOTE
-    ProviderId.CLAUDE, ProviderId.GEMINI -> CapabilityBadge.UNAVAILABLE
 }

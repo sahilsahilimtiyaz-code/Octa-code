@@ -32,10 +32,11 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.sahil.octacode.ui.theme.ChatMuted
 import com.sahil.octacode.ui.theme.ElectricPurple
 import com.sahil.octacode.ui.theme.GoldLight
 import com.sahil.octacode.ui.theme.NeonBlue
-import com.sahil.octacode.ui.theme.OnDarkMuted
+import com.sahil.octacode.ui.theme.OnDark
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -78,27 +79,28 @@ fun AgentHeader(
             Text(
                 text = "Octa Code",
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                color = OnDark
             )
             Text(
                 text = "C O D I N G  A S S I S T A N T",
                 style = MaterialTheme.typography.labelSmall,
                 fontSize = 10.sp,
-                color = OnDarkMuted
+                color = ChatMuted
             )
         }
         IconButton(onClick = {}, enabled = false) {
             Icon(
                 Icons.Filled.Search,
                 contentDescription = "Search unavailable — no project index yet",
-                tint = OnDarkMuted.copy(alpha = 0.4f)
+                tint = ChatMuted.copy(alpha = 0.4f)
             )
         }
         IconButton(onClick = {}, enabled = false) {
             Icon(
                 Icons.Filled.Notifications,
                 contentDescription = "Notifications unavailable",
-                tint = OnDarkMuted.copy(alpha = 0.4f)
+                tint = ChatMuted.copy(alpha = 0.4f)
             )
         }
         IconButton(onClick = onOpenSettings) {

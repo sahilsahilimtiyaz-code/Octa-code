@@ -23,9 +23,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
-import com.sahil.octacode.ui.theme.NeonGreen
-import com.sahil.octacode.ui.theme.OnDarkMuted
-import com.sahil.octacode.ui.theme.SurfaceDark
+import com.sahil.octacode.ui.theme.ChatCardBottom
+import com.sahil.octacode.ui.theme.ChatMuted
+import com.sahil.octacode.ui.theme.DotGreen
+import com.sahil.octacode.ui.theme.GoldMid
+import com.sahil.octacode.ui.theme.OnDark
 import com.sahil.octacode.ui.theme.WarningAmber
 
 // M4b session strip: project slot (real nav to Projects) │ agent dot (real registry).
@@ -40,8 +42,8 @@ fun SessionStatusBar(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(SurfaceDark)
-            .border(1.dp, OnDarkMuted.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
+            .background(ChatCardBottom)
+            .border(1.dp, ChatMuted.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -54,19 +56,20 @@ fun SessionStatusBar(
             Icon(
                 Icons.Filled.Folder,
                 contentDescription = null,
-                tint = WarningAmber,
+                tint = GoldMid,
                 modifier = Modifier.size(20.dp)
             )
             Spacer(Modifier.width(8.dp))
             Text(
                 text = "No project selected",
                 style = MaterialTheme.typography.bodyMedium,
+                color = OnDark,
                 modifier = Modifier.weight(1f, fill = false)
             )
             Icon(
                 Icons.Filled.KeyboardArrowDown,
                 contentDescription = "Open projects",
-                tint = OnDarkMuted,
+                tint = ChatMuted,
                 modifier = Modifier.size(18.dp)
             )
         }
@@ -74,19 +77,19 @@ fun SessionStatusBar(
             modifier = Modifier
                 .padding(horizontal = 10.dp)
                 .size(width = 1.dp, height = 20.dp)
-                .background(OnDarkMuted.copy(alpha = 0.35f))
+                .background(ChatMuted.copy(alpha = 0.35f))
         )
         Box(
             modifier = Modifier
                 .size(8.dp)
                 .clip(CircleShape)
-                .background(if (agentReady) NeonGreen else WarningAmber.copy(alpha = 0.85f))
+                .background(if (agentReady) DotGreen else WarningAmber.copy(alpha = 0.85f))
         )
         Spacer(Modifier.width(6.dp))
         Text(
             text = agentText,
             style = MaterialTheme.typography.bodySmall,
-            color = OnDarkMuted
+            color = ChatMuted
         )
     }
 }
