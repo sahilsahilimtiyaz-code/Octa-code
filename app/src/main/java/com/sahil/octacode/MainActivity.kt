@@ -10,15 +10,16 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Chat
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -48,18 +49,16 @@ import com.sahil.octacode.ui.navigation.Routes
 import com.sahil.octacode.ui.theme.Gold
 import com.sahil.octacode.ui.theme.GoldBright
 import com.sahil.octacode.ui.theme.OctaCodeTheme
+import com.sahil.octacode.ui.theme.OnDark
 import com.sahil.octacode.ui.theme.OnDarkMuted
 
+/** Reference bottom bar: Workspace / Code / Terminal (Settings via header menu). */
 private data class BottomDest(val route: String, val label: String, val icon: ImageVector)
 
-// Reference agent chrome: Workspace / Code / Terminal + Settings as overflow via chat menu.
-// Kept full set for app function; active item uses gold pill like the mock.
 private val BOTTOM_DESTS = listOf(
-    BottomDest(Routes.HOME, "Workspace", Icons.Filled.Home),
-    BottomDest(Routes.CHAT, "Agent", Icons.AutoMirrored.Filled.Chat),
-    BottomDest(Routes.PROJECTS, "Code", Icons.Filled.Folder),
-    BottomDest(Routes.TERMINAL, "Terminal", Icons.Filled.Terminal),
-    BottomDest(Routes.SETTINGS, "Settings", Icons.Filled.Settings)
+    BottomDest(Routes.HOME, "Workspace", Icons.Filled.Code),
+    BottomDest(Routes.PROJECTS, "Code", Icons.Filled.Layers),
+    BottomDest(Routes.TERMINAL, "Terminal", Icons.Filled.Terminal)
 )
 
 class MainActivity : ComponentActivity() {
@@ -117,75 +116,91 @@ private fun OctaScaffold() {
 }
 
 /**
- * Glass bottom bar with gold active pill — matches the Agent reference mock.
+ * Glass bottom bar with gold active pill on the icon + label underline — reference mock.
+ * Chat (Agent) highlights Workspace, matching the mock while Chat is open.
  */
 @Composable
 private fun AgentBottomBar(
     currentRoute: String?,
     onSelect: (String) -> Unit
 ) {
+    val activeRoute = when (currentRoute) {
+        Routes.CHAT -> Routes.HOME
+        else -> currentRoute
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(Color(0xF20A1425))
-            .padding(horizontal = 8.dp, vertical = 10.dp),
+            .padding(horizontal = 12.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.Top
     ) {
         BOTTOM_DESTS.forEach { dest ->
-            val selected = currentRoute == dest.route
+            val selected = activeRoute == dest.route
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .then(
-                        if (selected) {
-                            Modifier
-                                .background(
-                                    Brush.horizontalGradient(
-                                        listOf(
-                                            Gold.copy(alpha = 0.22f),
-                                            GoldBright.copy(alpha = 0.12f)
+                    .clip(RoundedCornerShape(18.dp))
+                    .clickable { onSelect(dest.route) }
+                    .padding(horizontal = 8.dp, vertical = 2.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .then(
+                            if (selected) {
+                                Modifier
+                                    .background(
+                                        Brush.horizontalGradient(
+                                            listOf(
+                                                Gold.copy(alpha = 0.18f),
+                                                GoldBright.copy(alpha = 0.10f)
+                                            )
                                         )
                                     )
-                                )
-                                .border(
-                                    1.dp,
-                                    Brush.horizontalGradient(
-                                        listOf(GoldBright.copy(alpha = 0.85f), Gold.copy(alpha = 0.35f))
-                                    ),
-                                    RoundedCornerShape(20.dp)
-                                )
-                        } else {
-                            Modifier
-                        }
-                    )
-                    .clickable { onSelect(dest.route) }
-                    .padding(horizontal = 14.dp, vertical = 8.dp)
-            ) {
-                Icon(
-                    imageVector = dest.icon,
-                    contentDescription = dest.label,
-                    tint = if (selected) GoldBright else OnDarkMuted,
-                    modifier = Modifier.size(22.dp)
-                )
-                Text(
-                    text = dest.label,
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                        fontSize = 11.sp
-                    ),
-                    color = if (selected) GoldBright else OnDarkMuted,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-                if (selected) {
-                    Box(
-                        modifier = Modifier
-                            .padding(top = 4.dp)
-                            .size(width = 18.dp, height = 2.dp)
-                            .background(GoldBright, RoundedCornerShape(1.dp))
+                                    .border(
+                                        1.5.dp,
+                                        Brush.horizontalGradient(
+                                            listOf(GoldBright, Gold.copy(alpha = 0.70f))
+                                        ),
+                                        RoundedCornerShape(16.dp)
+                                    )
+                            } else {
+                                Modifier
+                            }
+                        )
+                        .padding(horizontal = 28.dp, vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = dest.icon,
+                        contentDescription = dest.label,
+                        tint = if (selected) GoldBright else OnDarkMuted,
+                        modifier = Modifier.size(26.dp)
                     )
                 }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = dest.label,
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                        fontSize = 13.sp
+                    ),
+                    color = if (selected) OnDark else OnDarkMuted
+                )
+                Spacer(Modifier.height(6.dp))
+                Box(
+                    modifier = Modifier
+                        .width(if (selected) 48.dp else 0.dp)
+                        .height(if (selected) 2.5.dp else 0.dp)
+                        .background(
+                            if (selected) Brush.horizontalGradient(
+                                listOf(Gold.copy(alpha = 0.2f), GoldBright, Gold.copy(alpha = 0.2f))
+                            ) else Brush.horizontalGradient(listOf(Color.Transparent, Color.Transparent)),
+                            RoundedCornerShape(2.dp)
+                        )
+                )
             }
         }
     }

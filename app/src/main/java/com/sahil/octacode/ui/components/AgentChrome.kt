@@ -20,6 +20,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -45,7 +49,6 @@ import com.sahil.octacode.ui.theme.NeonBlue
 import com.sahil.octacode.ui.theme.NeonGreen
 import com.sahil.octacode.ui.theme.OnDark
 import com.sahil.octacode.ui.theme.OnDarkMuted
-import com.sahil.octacode.ui.theme.WarningAmber
 
 /** Circular glass icon button used in the Agent header. */
 @Composable
@@ -53,15 +56,14 @@ fun GlassIconButton(
     onClick: () -> Unit,
     contentDescription: String?,
     modifier: Modifier = Modifier,
-    tint: Color = OnDark,
     content: @Composable () -> Unit
 ) {
     Box(
         modifier = modifier
-            .size(44.dp)
+            .size(48.dp)
             .clip(CircleShape)
-            .background(Color.White.copy(alpha = 0.04f))
-            .border(1.dp, Color.White.copy(alpha = 0.18f), CircleShape)
+            .background(Color.White.copy(alpha = 0.03f))
+            .border(1.dp, Color.White.copy(alpha = 0.22f), CircleShape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
@@ -85,37 +87,42 @@ fun AgentTopBar(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             GlassIconButton(onClick = onMenu, contentDescription = "Menu") {
-                Icon(Icons.Outlined.Menu, contentDescription = null, tint = OnDark, modifier = Modifier.size(22.dp))
+                Icon(Icons.Outlined.Menu, contentDescription = null, tint = OnDark, modifier = Modifier.size(24.dp))
             }
+            Spacer(Modifier.width(14.dp))
+            HexLogo(modifier = Modifier.size(50.dp))
             Spacer(Modifier.width(12.dp))
-            HexLogo(modifier = Modifier.size(40.dp))
-            Spacer(Modifier.width(10.dp))
             Column {
                 Text(
                     text = "Octa Code",
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 22.sp,
-                        letterSpacing = 0.2.sp
+                        fontSize = 26.sp,
+                        lineHeight = 30.sp,
+                        letterSpacing = 0.1.sp
                     ),
                     color = OnDark
                 )
                 Text(
                     text = "CODING ASSISTANT",
-                    style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 2.2.sp),
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 11.sp,
+                        letterSpacing = 3.2.sp,
+                        fontWeight = FontWeight.Medium
+                    ),
                     color = OnDarkMuted
                 )
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             GlassIconButton(onClick = onSearch, contentDescription = "Search") {
-                Icon(Icons.Filled.Search, contentDescription = null, tint = OnDark, modifier = Modifier.size(20.dp))
+                Icon(Icons.Filled.Search, contentDescription = null, tint = OnDark, modifier = Modifier.size(22.dp))
             }
             GlassIconButton(onClick = onNotifications, contentDescription = "Notifications") {
-                Icon(Icons.Filled.Notifications, contentDescription = null, tint = OnDark, modifier = Modifier.size(20.dp))
+                Icon(Icons.Filled.Notifications, contentDescription = null, tint = OnDark, modifier = Modifier.size(22.dp))
             }
             GlassIconButton(onClick = onProfile, contentDescription = "Profile") {
-                Icon(Icons.Filled.Person, contentDescription = null, tint = OnDark, modifier = Modifier.size(20.dp))
+                Icon(Icons.Filled.Person, contentDescription = null, tint = OnDark, modifier = Modifier.size(22.dp))
             }
         }
     }
@@ -129,40 +136,31 @@ fun HexLogo(modifier: Modifier = Modifier) {
         val h = size.height
         val cx = w / 2f
         val cy = h / 2f
-        val r = w * 0.42f
-        val hex = Path().apply {
+        val r = w * 0.44f
+        fun hexPath(scale: Float): Path = Path().apply {
             for (i in 0 until 6) {
                 val angle = Math.toRadians((60.0 * i - 30.0))
-                val x = cx + (r * kotlin.math.cos(angle)).toFloat()
-                val y = cy + (r * kotlin.math.sin(angle)).toFloat()
+                val x = cx + (r * scale * kotlin.math.cos(angle)).toFloat()
+                val y = cy + (r * scale * kotlin.math.sin(angle)).toFloat()
                 if (i == 0) moveTo(x, y) else lineTo(x, y)
             }
             close()
         }
         drawPath(
-            path = hex,
+            path = hexPath(1f),
             brush = Brush.linearGradient(
                 colors = listOf(GoldBright, Gold, NeonBlue),
                 start = Offset(0f, 0f),
                 end = Offset(w, h)
             ),
-            style = Stroke(width = w * 0.08f)
+            style = Stroke(width = w * 0.075f)
         )
-        // Inner cut
-        val inner = Path().apply {
-            for (i in 0 until 6) {
-                val angle = Math.toRadians((60.0 * i - 30.0))
-                val x = cx + (r * 0.55f * kotlin.math.cos(angle)).toFloat()
-                val y = cy + (r * 0.55f * kotlin.math.sin(angle)).toFloat()
-                if (i == 0) moveTo(x, y) else lineTo(x, y)
-            }
-            close()
-        }
-        drawPath(inner, color = Color.Black.copy(alpha = 0.55f))
+        val inner = hexPath(0.58f)
+        drawPath(inner, color = Color.Black.copy(alpha = 0.7f))
         drawPath(
             path = inner,
             brush = Brush.linearGradient(listOf(Gold, NeonBlue)),
-            style = Stroke(width = w * 0.05f)
+            style = Stroke(width = w * 0.045f)
         )
     }
 }
@@ -179,68 +177,73 @@ fun AgentStatusPill(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(28.dp))
+            .clip(RoundedCornerShape(32.dp))
             .background(Color.White.copy(alpha = 0.035f))
             .border(
                 1.dp,
                 Brush.horizontalGradient(
-                    listOf(Gold.copy(alpha = 0.55f), Color.White.copy(alpha = 0.12f), NeonBlue.copy(alpha = 0.35f))
+                    listOf(
+                        Gold.copy(alpha = 0.55f),
+                        Color.White.copy(alpha = 0.10f),
+                        NeonBlue.copy(alpha = 0.28f)
+                    )
                 ),
-                RoundedCornerShape(28.dp)
+                RoundedCornerShape(32.dp)
             )
             .clickable(onClick = onProjectClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(horizontal = 20.dp, vertical = 18.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Folder icon (gold stroke square-ish)
-        Box(
-            modifier = Modifier
-                .size(28.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .border(1.5.dp, Gold, RoundedCornerShape(8.dp)),
-            contentAlignment = Alignment.Center
+        Row(
+            modifier = Modifier.weight(1.25f),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Canvas(Modifier.size(16.dp)) {
-                val path = Path().apply {
-                    moveTo(size.width * 0.1f, size.height * 0.35f)
-                    lineTo(size.width * 0.38f, size.height * 0.35f)
-                    lineTo(size.width * 0.48f, size.height * 0.48f)
-                    lineTo(size.width * 0.9f, size.height * 0.48f)
-                    lineTo(size.width * 0.9f, size.height * 0.78f)
-                    lineTo(size.width * 0.1f, size.height * 0.78f)
-                    close()
-                }
-                drawPath(path, color = Gold, style = Stroke(width = 2.dp.toPx()))
-            }
+            Icon(
+                Icons.Outlined.Folder,
+                contentDescription = null,
+                tint = Gold,
+                modifier = Modifier.size(30.dp)
+            )
+            Spacer(Modifier.width(14.dp))
+            Text(
+                text = projectLabel,
+                style = MaterialTheme.typography.bodyLarge,
+                color = OnDark,
+                maxLines = 1,
+                modifier = Modifier.weight(1f, fill = true)
+            )
+            Icon(
+                Icons.Outlined.KeyboardArrowDown,
+                contentDescription = null,
+                tint = OnDarkMuted,
+                modifier = Modifier.size(22.dp)
+            )
         }
-        Spacer(Modifier.width(12.dp))
-        Text(
-            text = projectLabel,
-            style = MaterialTheme.typography.bodyLarge,
-            color = OnDark,
-            modifier = Modifier.weight(1f)
-        )
-        Text(text = "⌄", color = OnDarkMuted, style = MaterialTheme.typography.bodyLarge)
         Box(
             modifier = Modifier
+                .padding(horizontal = 14.dp)
                 .width(1.dp)
-                .height(28.dp)
+                .height(36.dp)
                 .background(Color.White.copy(alpha = 0.14f))
-                .padding(horizontal = 12.dp)
         )
-        Spacer(Modifier.width(14.dp))
-        Box(
-            modifier = Modifier
-                .size(8.dp)
-                .clip(CircleShape)
-                .background(if (agentReady) NeonGreen else WarningAmber)
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = agentLabel,
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (agentReady) NeonGreen else OnDark
-        )
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .clip(CircleShape)
+                    .background(if (agentReady) NeonGreen else NeonGreen.copy(alpha = 0.85f))
+            )
+            Spacer(Modifier.width(10.dp))
+            Text(
+                text = agentLabel,
+                style = MaterialTheme.typography.bodyLarge,
+                color = OnDark,
+                maxLines = 1
+            )
+        }
     }
 }
 
@@ -249,71 +252,62 @@ fun AgentStatusPill(
 fun HeroPlanet(modifier: Modifier = Modifier) {
     val motion = LocalMotionPolicy.current
     Canvas(modifier = modifier) {
-        val cx = size.width * 0.62f
-        val cy = size.height * 0.48f
-        val r = size.minDimension * 0.28f
+        val cx = size.width * 0.68f
+        val cy = size.height * 0.50f
+        val r = size.minDimension * 0.34f
 
-        // Soft glow
         drawCircle(
             brush = Brush.radialGradient(
-                colors = listOf(Gold.copy(alpha = 0.22f), NeonBlue.copy(alpha = 0.10f), Color.Transparent),
+                colors = listOf(Gold.copy(alpha = 0.20f), NeonBlue.copy(alpha = 0.08f), Color.Transparent),
                 center = Offset(cx, cy),
-                radius = r * 2.4f
+                radius = r * 2.5f
             ),
-            radius = r * 2.4f,
+            radius = r * 2.5f,
             center = Offset(cx, cy)
         )
-        // Planet body
         drawCircle(
             brush = Brush.radialGradient(
-                colors = listOf(
-                    Color(0xFF1A2740),
-                    Color(0xFF0B1220),
-                    Color(0xFF05070E)
-                ),
-                center = Offset(cx - r * 0.3f, cy - r * 0.35f),
-                radius = r * 1.2f
+                colors = listOf(Color(0xFF1C2A44), Color(0xFF0A101C), Color(0xFF04060C)),
+                center = Offset(cx - r * 0.28f, cy - r * 0.32f),
+                radius = r * 1.25f
             ),
             radius = r,
             center = Offset(cx, cy)
         )
-        // Terminator highlight
         drawCircle(
             brush = Brush.radialGradient(
-                colors = listOf(GoldBright.copy(alpha = 0.55f), Gold.copy(alpha = 0.15f), Color.Transparent),
-                center = Offset(cx - r * 0.35f, cy - r * 0.4f),
-                radius = r * 0.95f
+                colors = listOf(GoldBright.copy(alpha = 0.70f), Gold.copy(alpha = 0.18f), Color.Transparent),
+                center = Offset(cx - r * 0.38f, cy - r * 0.42f),
+                radius = r * 1.0f
             ),
             radius = r,
             center = Offset(cx, cy)
         )
-        // Orbital rings
         val ringStroke = 2.5.dp.toPx()
         drawOval(
             brush = Brush.horizontalGradient(
-                colors = listOf(Color.Transparent, Gold.copy(alpha = 0.85f), NeonBlue.copy(alpha = 0.55f), Color.Transparent)
+                colors = listOf(Color.Transparent, Gold.copy(alpha = 0.9f), NeonBlue.copy(alpha = 0.55f), Color.Transparent)
             ),
-            topLeft = Offset(cx - r * 1.7f, cy - r * 0.55f),
-            size = androidx.compose.ui.geometry.Size(r * 3.4f, r * 1.15f),
+            topLeft = Offset(cx - r * 1.85f, cy - r * 0.62f),
+            size = androidx.compose.ui.geometry.Size(r * 3.7f, r * 1.25f),
             style = Stroke(width = ringStroke)
         )
         drawOval(
             brush = Brush.horizontalGradient(
-                colors = listOf(Color.Transparent, NeonBlue.copy(alpha = 0.7f), Gold.copy(alpha = 0.5f), Color.Transparent)
+                colors = listOf(Color.Transparent, NeonBlue.copy(alpha = 0.75f), Gold.copy(alpha = 0.45f), Color.Transparent)
             ),
-            topLeft = Offset(cx - r * 1.45f, cy - r * 0.15f),
-            size = androidx.compose.ui.geometry.Size(r * 2.9f, r * 0.85f),
+            topLeft = Offset(cx - r * 1.55f, cy - r * 0.18f),
+            size = androidx.compose.ui.geometry.Size(r * 3.1f, r * 0.90f),
             style = Stroke(width = ringStroke * 0.85f)
         )
         if (!motion.reducedMotion) {
-            // subtle arc accent
             drawArc(
-                color = GoldBright.copy(alpha = 0.35f),
-                startAngle = -40f,
-                sweepAngle = 70f,
+                color = GoldBright.copy(alpha = 0.40f),
+                startAngle = -50f,
+                sweepAngle = 75f,
                 useCenter = false,
-                topLeft = Offset(cx - r * 1.1f, cy - r * 1.1f),
-                size = androidx.compose.ui.geometry.Size(r * 2.2f, r * 2.2f),
+                topLeft = Offset(cx - r * 1.15f, cy - r * 1.15f),
+                size = androidx.compose.ui.geometry.Size(r * 2.3f, r * 2.3f),
                 style = Stroke(width = ringStroke * 0.7f)
             )
         }
@@ -333,55 +327,65 @@ fun AccentInfoCard(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(22.dp))
             .background(
                 Brush.verticalGradient(
                     listOf(
-                        Color.White.copy(alpha = 0.045f),
+                        Color.White.copy(alpha = 0.05f),
                         Color.White.copy(alpha = 0.02f)
                     )
                 )
             )
             .border(
-                1.2.dp,
+                1.5.dp,
                 Brush.horizontalGradient(
                     listOf(
-                        accent.copy(alpha = 0.85f),
-                        accent.copy(alpha = 0.35f),
-                        Color.White.copy(alpha = 0.08f)
+                        accent.copy(alpha = 0.95f),
+                        accent.copy(alpha = 0.70f),
+                        accent.copy(alpha = 0.40f)
                     )
                 ),
-                RoundedCornerShape(20.dp)
+                RoundedCornerShape(22.dp)
             )
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 18.dp),
+            .padding(horizontal = 18.dp, vertical = 20.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(56.dp)
-                .clip(RoundedCornerShape(16.dp))
+                .size(64.dp)
+                .clip(RoundedCornerShape(18.dp))
                 .background(Color.White.copy(alpha = 0.04f))
-                .border(1.dp, accent.copy(alpha = 0.55f), RoundedCornerShape(16.dp)),
+                .border(1.2.dp, accent.copy(alpha = 0.70f), RoundedCornerShape(18.dp)),
             contentAlignment = Alignment.Center
         ) {
             icon()
         }
-        Spacer(Modifier.width(14.dp))
+        Spacer(Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 19.sp,
+                    lineHeight = 24.sp
+                ),
                 color = OnDark
             )
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(6.dp))
             Text(
                 text = message,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 21.sp),
                 color = OnDarkMuted
             )
         }
-        Text(text = "›", style = MaterialTheme.typography.headlineSmall, color = OnDarkMuted)
+        Spacer(Modifier.width(8.dp))
+        Icon(
+            Icons.Outlined.ChevronRight,
+            contentDescription = null,
+            tint = OnDarkMuted,
+            modifier = Modifier.size(28.dp)
+        )
     }
 }
 
@@ -391,16 +395,21 @@ fun AgentHeroCopy(modifier: Modifier = Modifier) {
     Column(modifier = modifier) {
         Text(
             text = "YOUR CODING PARTNER",
-            style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 2.5.sp),
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontSize = 12.sp,
+                letterSpacing = 3.5.sp,
+                fontWeight = FontWeight.Medium
+            ),
             color = OnDarkMuted
         )
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(10.dp))
         Text(
             text = "Build Better",
             style = MaterialTheme.typography.displayMedium.copy(
                 fontWeight = FontWeight.Bold,
-                fontSize = 42.sp,
-                lineHeight = 48.sp
+                fontSize = 46.sp,
+                lineHeight = 52.sp,
+                letterSpacing = (-0.5).sp
             ),
             color = OnDark
         )
@@ -408,15 +417,16 @@ fun AgentHeroCopy(modifier: Modifier = Modifier) {
             text = "Together",
             style = MaterialTheme.typography.displayMedium.copy(
                 fontWeight = FontWeight.Bold,
-                fontSize = 42.sp,
-                lineHeight = 48.sp
+                fontSize = 46.sp,
+                lineHeight = 52.sp,
+                letterSpacing = (-0.5).sp
             ),
             color = GoldText
         )
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(12.dp))
         Text(
             text = "Your coding conversation and\nmission activity will appear here.",
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 26.sp),
             color = OnDarkMuted
         )
     }
@@ -428,36 +438,36 @@ fun ComposerPill(
     label: String,
     leadingIcon: @Composable () -> Unit,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    accent: Color = NeonBlue
+    modifier: Modifier = Modifier
 ) {
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(24.dp))
-            .background(Color.White.copy(alpha = 0.04f))
-            .border(
-                1.dp,
-                Brush.horizontalGradient(listOf(accent.copy(alpha = 0.45f), Color.White.copy(alpha = 0.1f))),
-                RoundedCornerShape(24.dp)
-            )
+            .clip(RoundedCornerShape(28.dp))
+            .background(Color.White.copy(alpha = 0.03f))
+            .border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(28.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         leadingIcon()
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(10.dp))
         Text(
             text = label,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyLarge,
             color = OnDark,
             maxLines = 1
         )
-        Spacer(Modifier.width(6.dp))
-        Text(text = "⌄", color = OnDarkMuted, style = MaterialTheme.typography.bodySmall)
+        Spacer(Modifier.width(4.dp))
+        Icon(
+            Icons.Outlined.KeyboardArrowDown,
+            contentDescription = null,
+            tint = OnDarkMuted,
+            modifier = Modifier.size(20.dp)
+        )
     }
 }
 
-/** Circular gold send / stop control. */
+/** Circular gold send / stop control with glow ring (reference). */
 @Composable
 fun GoldSendButton(
     enabled: Boolean,
@@ -466,47 +476,69 @@ fun GoldSendButton(
     modifier: Modifier = Modifier
 ) {
     Box(
-        modifier = modifier
-            .size(52.dp)
-            .clip(CircleShape)
-            .background(
-                if (enabled || busy) {
-                    Brush.radialGradient(
-                        colors = listOf(GoldBright, Gold, GoldDeep)
-                    )
-                } else {
-                    Brush.radialGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.12f),
-                            Color.White.copy(alpha = 0.06f)
-                        )
-                    )
-                }
-            )
-            .border(
-                1.5.dp,
-                if (enabled || busy) GoldBright.copy(alpha = 0.9f) else Color.White.copy(alpha = 0.2f),
-                CircleShape
-            )
-            .clickable(enabled = enabled || busy, onClick = onClick),
+        modifier = modifier.size(56.dp),
         contentAlignment = Alignment.Center
     ) {
-        if (busy) {
-            // Stop square
-            Box(
-                modifier = Modifier
-                    .size(14.dp)
-                    .background(Color(0xFF1A1208), RoundedCornerShape(2.dp))
-            )
-        } else {
-            Canvas(Modifier.size(22.dp)) {
-                val path = Path().apply {
-                    moveTo(size.width * 0.18f, size.height * 0.5f)
-                    lineTo(size.width * 0.78f, size.height * 0.22f)
-                    lineTo(size.width * 0.78f, size.height * 0.78f)
-                    close()
-                }
-                drawPath(path, color = if (enabled) Color(0xFF1A1208) else OnDarkMuted.copy(alpha = 0.6f))
+        // Outer glow
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(CircleShape)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            Gold.copy(alpha = if (enabled || busy) 0.45f else 0.22f),
+                            Gold.copy(alpha = 0.10f),
+                            Color.Transparent
+                        )
+                    )
+                )
+        )
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(
+                    if (enabled || busy) {
+                        Brush.radialGradient(
+                            colors = listOf(GoldBright.copy(alpha = 0.35f), Color(0xFF1A1408), Color(0xFF0C0A06))
+                        )
+                    } else {
+                        Brush.radialGradient(
+                            colors = listOf(Color.White.copy(alpha = 0.10f), Color(0xFF0C0C14))
+                        )
+                    }
+                )
+                .border(
+                    1.8.dp,
+                    if (enabled || busy) {
+                        Brush.linearGradient(listOf(GoldBright, Gold, GoldDeep))
+                    } else {
+                        Brush.linearGradient(
+                            listOf(
+                                Gold.copy(alpha = 0.55f),
+                                Gold.copy(alpha = 0.30f)
+                            )
+                        )
+                    },
+                    CircleShape
+                )
+                .clickable(enabled = enabled || busy, onClick = onClick),
+            contentAlignment = Alignment.Center
+        ) {
+            if (busy) {
+                Box(
+                    modifier = Modifier
+                        .size(14.dp)
+                        .background(GoldBright, RoundedCornerShape(2.dp))
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Filled.Send,
+                    contentDescription = "Send",
+                    tint = if (enabled) GoldBright else OnDarkMuted.copy(alpha = 0.7f),
+                    modifier = Modifier.size(22.dp)
+                )
             }
         }
     }

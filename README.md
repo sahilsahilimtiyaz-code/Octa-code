@@ -82,11 +82,20 @@ Native Android AI coding workstation. No legacy, no stubs wired as real.
 - `AgentChrome` kit: glass top bar + hex logo, status pill, hero planet, accent info cards, composer pills, gold send/stop
 - Chat empty state: “Build Better / Together” hero + Agent unavailable / Mission activity cards
 - Live conversation reuses `ChatBubble` + real `ChatEngine` (unchanged)
-- Bottom bar: gold active pill for Workspace / Agent / Code / Terminal / Settings
 - Nav: menu/profile → Settings, project pill/cards → Projects
 - **94 unit tests still passing** (`:app:testDebugUnitTest`)
 
+### M4.2 Chat UI pixel pass
+- Bottom bar reduced to reference set: **Workspace / Code / Terminal** (gold pill on active icon + label underline); Settings via header menu
+- Status pill: gold folder outline, split project | agent halves, green readiness dot
+- Hero: larger cut-off planet + “Build Better / Together” typography matched to mock
+- Cards: 64dp icon wells, 19sp titles, full accent borders (gold / cyan)
+- Composer: gold→cyan border, Model 1.55:1 Project pills, BasicTextField + glowing gold Send
+- Spacing/horizontal gutters aligned to mock (20dp page margin)
+- **94 unit tests still passing** (`:app:testDebugUnitTest`)
+
 ## Setup
+1. Copy this folder into your projects directory.
 2. Open as existing Gradle project (AGP 8.5.2 + Kotlin 1.9.24).
 3. Run `app` on device (minSdk 26).
 
