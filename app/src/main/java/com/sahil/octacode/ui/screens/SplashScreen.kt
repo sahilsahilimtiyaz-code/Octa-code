@@ -27,7 +27,7 @@ fun SplashScreen(onDone: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("Octa Code", style = MaterialTheme.typography.displayMedium, color = MaterialTheme.colorScheme.primary)
+        Text("Octa Code", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.height(8.dp))
         Text("Mobile AI Coding Agent", style = MaterialTheme.typography.bodyLarge)
         Spacer(Modifier.height(24.dp))

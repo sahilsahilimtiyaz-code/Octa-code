@@ -35,11 +35,14 @@ import com.sahil.octacode.domain.mission.MissionStatus
 import com.sahil.octacode.ui.components.BannerTone
 import com.sahil.octacode.ui.components.DiffCard
 import com.sahil.octacode.ui.components.GlassPanel
+import com.sahil.octacode.ui.components.MissionProgressCard
 import com.sahil.octacode.ui.components.PhaseRail
 import com.sahil.octacode.ui.components.StatusBanner
 import com.sahil.octacode.ui.components.StreamTerminal
 import com.sahil.octacode.ui.components.ThinkingOrb
+import com.sahil.octacode.ui.components.TypingIndicator
 import com.sahil.octacode.ui.components.bannerToneFor
+import com.sahil.octacode.ui.state.MissionProgressUi
 import com.sahil.octacode.ui.theme.NeonBlue
 import com.sahil.octacode.ui.theme.NeonGreen
 import com.sahil.octacode.ui.theme.OnDarkMuted
@@ -47,7 +50,7 @@ import com.sahil.octacode.ui.theme.WarningAmber
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
-// M3c MissionDetail: engine state + phase rail + stream + checkpoint + live diffs.
+// M3d MissionDetail: engine StateFlow + Room flows → premium glass mission UX.
 @Composable
 fun MissionDetailScreen(
     missionId: String,
@@ -70,7 +73,7 @@ fun MissionDetailScreen(
     val phaseStatuses = runs.associate { it.phase to it.status }
         .ifEmpty { engineState.phaseStatuses }
     val currentPhase = mission?.currentPhase ?: engineState.currentPhase
-    val failure = mission?.failureReason
+    val failure = mission?.failureReason ?: engineState.lastError
     val terminal = status == MissionStatus.FAILED ||
         status == MissionStatus.COMPLETE ||
         status == MissionStatus.CANCELLED
@@ -87,6 +90,18 @@ fun MissionDetailScreen(
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
             }
             Text("Mission", style = MaterialTheme.typography.headlineSmall)
+        }
+
+        if (engineState.busy || status == MissionStatus.RUNNING) {
+            MissionProgressCard(
+                mission = MissionProgressUi(
+                    status = status.name,
+                    currentStep = currentPhase?.let { "${it.index}. ${it.title} — ${engineState.message}" }
+                        ?: engineState.message.ifBlank { "Running…" },
+                    progress = ((engineState.percent ?: 0) / 100f),
+                    startedAtEpochMillis = mission?.createdAt
+                )
+            )
         }
 
         GlassPanel(title = mission?.goal ?: "…", accent = NeonBlue) {
@@ -116,10 +131,25 @@ fun MissionDetailScreen(
                     color = NeonGreen
                 )
             }
+            if (failure != null && !terminal) {
+                Spacer(Modifier.height(6.dp))
+                StatusBanner(
+                    tone = BannerTone.Error,
+                    title = "Error",
+                    message = failure
+                )
+            }
         }
 
         if (engineState.busy && !engineState.awaitingApproval) {
-            ThinkingOrb(label = engineState.message.ifBlank { "Working" })
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                ThinkingOrb(label = engineState.message.ifBlank { "Working" })
+                Spacer(Modifier.height(8.dp))
+                TypingIndicator()
+            }
         }
 
         if (engineState.awaitingApproval) {

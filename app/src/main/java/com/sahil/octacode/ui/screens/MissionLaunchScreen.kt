@@ -36,19 +36,18 @@ import com.sahil.octacode.core.capability.ProjectTypeDetector
 import com.sahil.octacode.core.capability.ProviderStatus
 import com.sahil.octacode.core.provider.ProviderId
 import com.sahil.octacode.domain.mission.MissionEngine
+import com.sahil.octacode.ui.components.BannerTone
 import com.sahil.octacode.ui.components.GlassPanel
 import com.sahil.octacode.ui.components.StatusBanner
-import com.sahil.octacode.ui.components.BannerTone
 import com.sahil.octacode.ui.theme.NeonBlue
 import com.sahil.octacode.ui.theme.NeonGreen
-import com.sahil.octacode.ui.theme.NeonRed
 import com.sahil.octacode.ui.theme.OnDarkMuted
 import com.sahil.octacode.ui.theme.WarningAmber
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import java.io.File
 
-// M3b MissionLaunch: real inputs → engine.launch → navigate to detail.
+// M3d MissionLaunch: real inputs → engine.launch → navigate to detail (premium glass).
 @Composable
 fun MissionLaunchScreen(
     onBack: () -> Unit,
@@ -148,6 +147,13 @@ fun MissionLaunchScreen(
             }
             val tone = if (st is ProviderStatus.Ready) NeonGreen else WarningAmber
             Text(line, style = MaterialTheme.typography.bodySmall, color = tone)
+            Spacer(Modifier.height(6.dp))
+            OutlinedButton(
+                onClick = {
+                    scope.launch { statuses = registry.refreshAll() }
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Refresh provider status") }
         }
 
         GlassPanel(title = "Autonomy", accent = WarningAmber) {

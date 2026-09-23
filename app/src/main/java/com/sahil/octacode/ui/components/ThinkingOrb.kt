@@ -24,35 +24,45 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.sahil.octacode.ui.motion.LocalMotionPolicy
 import com.sahil.octacode.ui.theme.ElectricPurple
 import com.sahil.octacode.ui.theme.NeonBlue
 import com.sahil.octacode.ui.theme.OnDarkMuted
 
-// M3b UI kit: pulsing "thinking" orb while the engine is busy.
+// M3d UI kit: pulsing "thinking" orb while the engine is busy (reduced-motion safe).
 @Composable
 fun ThinkingOrb(
     label: String = "Working",
     modifier: Modifier = Modifier
 ) {
+    val reducedMotion = LocalMotionPolicy.current.reducedMotion
     val transition = rememberInfiniteTransition(label = "orb")
-    val pulse by transition.animateFloat(
-        initialValue = 0.85f,
-        targetValue = 1.12f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(900, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulse"
-    )
-    val alpha by transition.animateFloat(
-        initialValue = 0.55f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(900, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "alpha"
-    )
+    val pulse by if (!reducedMotion) {
+        transition.animateFloat(
+            initialValue = 0.85f,
+            targetValue = 1.12f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(900, easing = LinearEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "pulse"
+        )
+    } else {
+        androidx.compose.animation.core.animateFloatAsState(targetValue = 1f, label = "pulse-static")
+    }
+    val alpha by if (!reducedMotion) {
+        transition.animateFloat(
+            initialValue = 0.55f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(900, easing = LinearEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "alpha"
+        )
+    } else {
+        androidx.compose.animation.core.animateFloatAsState(targetValue = 0.9f, label = "alpha-static")
+    }
 
     Column(
         modifier = modifier,
@@ -62,7 +72,7 @@ fun ThinkingOrb(
         Box(
             modifier = Modifier
                 .size(56.dp)
-                .scale(pulse)
+                .scale(if (reducedMotion) 1f else pulse)
                 .clip(CircleShape)
                 .background(
                     Brush.radialGradient(

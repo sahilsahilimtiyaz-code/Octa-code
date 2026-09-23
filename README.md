@@ -32,7 +32,7 @@ Native Android AI coding workstation. No legacy, no stubs wired as real.
 - `MissionRepository` contract + `RoomMissionRepository` (fail-loudly mappers)
 - Crash-recovery: `listRecoverable()` returns missions left RUNNING
 - Koin `dataModule` wired at app start (no orphans — M3b engine / M3d UI consume next)
-- Unit tests: phase matrix, repository contract, detectors, redaction, net logic, full pipeline — **85 passing**
+- Unit tests: phase matrix, repository contract, detectors, redaction, net logic, full pipeline — **86 passing**
 
 ### M3b Mission engine + UI kit + screens
 - `MissionEngine` — observable (`StateFlow`), cancellable, Room-persisted; resumes via `listRecoverable()`
@@ -56,6 +56,16 @@ Native Android AI coding workstation. No legacy, no stubs wired as real.
 - MissionDetail: live diff observe, Accept/Reject wired, phase-aware approval copy, rollback banner
 - Unit tests: full pipeline happy path, review gate, unsafe paths, no-edit fail, auto-rollback on test fail
 
+### M3d Mission engine UI wiring + premium polish
+- `MissionDetailScreen` binds `MissionEngine.state` + Room flows (mission, phase runs, events, diffs)
+- Live `PhaseRail`, `StreamTerminal`, `DiffCard` accept/reject, phase-aware approval copy, pause/cancel/resume, rollback banner
+- `MissionLaunchScreen`: goal/path/provider/autonomy glass panels, real registry status probe + Refresh, honest path gate
+- Home hub: running progress card, recoverable missions, recent list with status accents
+- UI kit polish: reduced-motion safe `PhaseRail`/`ThinkingOrb`/`StatusBanner`, stream copy + empty hint, patch preview truncation
+- Theme: full glass-morphism token set on DeepSpaceBlack / NeonBlue / ElectricPurple / NeonGreen / NeonRed
+- `OctaRoot` premium shell: starfield, motion policy locals, glass bottom bar (hidden on splash + mission routes)
+- **86 unit tests passing** (`:app:testDebugUnitTest`)
+
 ## Open in AndroidIDE / Android Studio
 1. Copy this folder into your projects directory.
 2. Open as existing Gradle project (AGP 8.5.2 + Kotlin 1.9.24).
@@ -65,7 +75,7 @@ Native Android AI coding workstation. No legacy, no stubs wired as real.
 - M3a Room schema / repository / tests — **done**
 - M3b Mission engine + UI kit + Launch/Detail — **done**
 - M3c Implement/diff/rollback handlers (phases 7–16) — **done**
-- M3d Deeper mission UX polish
+- M3d Mission engine UI wiring + premium polish — **done**
 - M4 Chat & Agent UI (streams from M2 adapters)
 - M5 Projects (index, editor, git, build, PTY terminal)
 - M6 Settings & credits polish

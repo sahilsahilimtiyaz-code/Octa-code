@@ -23,6 +23,8 @@ import com.sahil.octacode.domain.mission.MissionEngine
 import com.sahil.octacode.domain.mission.MissionRepository
 import com.sahil.octacode.domain.mission.MissionStatus
 import com.sahil.octacode.ui.components.GlassPanel
+import com.sahil.octacode.ui.components.MissionProgressCard
+import com.sahil.octacode.ui.state.MissionProgressUi
 import com.sahil.octacode.ui.theme.NeonBlue
 import com.sahil.octacode.ui.theme.NeonGreen
 import com.sahil.octacode.ui.theme.NeonRed
@@ -31,7 +33,7 @@ import com.sahil.octacode.ui.theme.WarningAmber
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
-// M3b Home hub: launch missions, resume recoverable, open recent.
+// M3d Home hub: launch missions, resume recoverable, open recent (premium glass).
 @Composable
 fun HomeScreen(
     onOpenChat: () -> Unit,
@@ -53,7 +55,7 @@ fun HomeScreen(
     ) {
         Text("Octa Code", style = MaterialTheme.typography.headlineLarge, color = NeonBlue)
         Text(
-            "Mobile AI Coding Agent — M3c full 16-phase pipeline",
+            "Mobile AI Coding Agent — M3d mission UX",
             style = MaterialTheme.typography.bodyMedium,
             color = OnDarkMuted
         )
@@ -75,19 +77,21 @@ fun HomeScreen(
         }
 
         if (engineState.activeMissionId != null && (engineState.busy || engineState.awaitingApproval)) {
-            GlassPanel(title = "Active engine", accent = NeonBlue) {
-                Text(
-                    "Phase ${engineState.currentPhase?.index ?: "—"} · ${engineState.message}",
-                    style = MaterialTheme.typography.bodySmall
+            MissionProgressCard(
+                mission = MissionProgressUi(
+                    status = engineState.status.name,
+                    currentStep = engineState.currentPhase?.let {
+                        "${it.index}. ${it.title} — ${engineState.message}"
+                    } ?: engineState.message,
+                    progress = ((engineState.percent ?: 0) / 100f)
                 )
-                engineState.activeMissionId?.let { id ->
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedButton(
-                        onClick = { onOpenMission(id) },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Open running mission")
-                    }
+            )
+            engineState.activeMissionId?.let { id ->
+                OutlinedButton(
+                    onClick = { onOpenMission(id) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Open running mission")
                 }
             }
         }

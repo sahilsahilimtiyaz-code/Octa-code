@@ -1,5 +1,6 @@
 package com.sahil.octacode.ui.components
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Column
@@ -9,10 +10,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.sahil.octacode.ui.motion.LocalMotionPolicy
 import com.sahil.octacode.ui.theme.NeonBlue
 import com.sahil.octacode.ui.theme.NeonGreen
 import com.sahil.octacode.ui.theme.NeonRed
@@ -23,7 +26,7 @@ import com.sahil.octacode.ui.theme.WarningAmber
 
 enum class BannerTone { Info, Success, Warning, Error, Running }
 
-// M3b UI kit: full-width status banner with tone colors.
+// M3d UI kit: full-width status banner with tone colors + subtle Running pulse.
 @Composable
 fun StatusBanner(
     tone: BannerTone,
@@ -39,12 +42,24 @@ fun StatusBanner(
         BannerTone.Running -> NeonBlue
     }
 
+    val reducedMotion = LocalMotionPolicy.current.reducedMotion
+    val borderAlpha by animateFloatAsState(
+        targetValue = if (tone == BannerTone.Running && !reducedMotion) 0.9f else 0.65f,
+        label = "banner-border"
+    )
+    val borderAccent = if (tone == BannerTone.Running && !reducedMotion) {
+        // gentle luminance shift for running state without infinite transition cost
+        accent.copy(alpha = borderAlpha)
+    } else {
+        accent.copy(alpha = 0.65f)
+    }
+
     Column(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(SurfaceVariantDark)
-            .border(1.dp, accent.copy(alpha = 0.65f), RoundedCornerShape(12.dp))
+            .border(1.dp, borderAccent, RoundedCornerShape(12.dp))
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
         Text(text = title, style = MaterialTheme.typography.titleSmall, color = accent)

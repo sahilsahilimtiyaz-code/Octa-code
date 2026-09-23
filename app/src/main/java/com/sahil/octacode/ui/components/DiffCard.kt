@@ -28,7 +28,7 @@ import com.sahil.octacode.ui.theme.OnDarkMuted
 import com.sahil.octacode.ui.theme.SurfaceVariantDark
 import com.sahil.octacode.ui.theme.WarningAmber
 
-// M3b UI kit: review card for a mission file diff.
+// M3d UI kit: review card for a mission file diff (patch truncated for mobile).
 @Composable
 fun DiffCard(
     diff: MissionDiff,
@@ -75,8 +75,9 @@ fun DiffCard(
                 color = OnDarkMuted
             )
             Spacer(Modifier.height(8.dp))
+            val patchPreview = rememberPatchPreview(diff.patchText)
             Text(
-                text = diff.patchText.ifBlank { "(empty patch)" },
+                text = patchPreview,
                 style = MaterialTheme.typography.bodySmall,
                 fontFamily = FontFamily.Monospace,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -98,4 +99,12 @@ fun DiffCard(
             }
         }
     }
+}
+
+private const val PATCH_PREVIEW_MAX = 1200
+
+private fun rememberPatchPreview(raw: String): String {
+    if (raw.isBlank()) return "(empty patch)"
+    if (raw.length <= PATCH_PREVIEW_MAX) return raw
+    return raw.take(PATCH_PREVIEW_MAX) + "\n… (truncated for mobile — full patch stored)"
 }

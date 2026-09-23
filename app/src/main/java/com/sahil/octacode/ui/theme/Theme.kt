@@ -38,6 +38,7 @@ fun OctaCodeTheme(
     }
     MaterialTheme(
         colorScheme = OctaDarkScheme,
+        typography = OctaTypography,
         content = content
     )
 }
