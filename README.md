@@ -32,7 +32,7 @@ Native Android AI coding workstation. No legacy, no stubs wired as real.
 - `MissionRepository` contract + `RoomMissionRepository` (fail-loudly mappers)
 - Crash-recovery: `listRecoverable()` returns missions left RUNNING
 - Koin `dataModule` wired at app start (no orphans — M3b engine / M3d UI consume next)
-- Unit tests: phase matrix, repository contract, detectors, redaction, net logic, full pipeline — **86 passing**
+- Unit tests: phase matrix, repository contract, detectors, redaction, net logic, full pipeline — **86+ passing**
 
 ### M3b Mission engine + UI kit + screens
 - `MissionEngine` — observable (`StateFlow`), cancellable, Room-persisted; resumes via `listRecoverable()`
@@ -64,9 +64,18 @@ Native Android AI coding workstation. No legacy, no stubs wired as real.
 - UI kit polish: reduced-motion safe `PhaseRail`/`ThinkingOrb`/`StatusBanner`, stream copy + empty hint, patch preview truncation
 - Theme: full glass-morphism token set on DeepSpaceBlack / NeonBlue / ElectricPurple / NeonGreen / NeonRed
 - `OctaRoot` premium shell: starfield, motion policy locals, glass bottom bar (hidden on splash + mission routes)
-- **86 unit tests passing** (`:app:testDebugUnitTest`)
+- **94 unit tests passing** (`:app:testDebugUnitTest`)
 
-## Open in AndroidIDE / Android Studio
+### M4 Chat & Agent UI
+- `ChatEngine` — StateFlow conversation; Ready-gate before send; cancellable stream (Stop)
+- Streams **live** from M2 `AiProvider.chatStream` (OpenAI / Custom) — no canned replies
+- Provider picker + real `CapabilityRegistry` status line (Ready / Unavailable + reason)
+- Chat bubbles: user vs agent, streaming label, honest Failed / Stopped captions
+- ThinkingOrb while waiting for first token; StatusBanner for ready-gate errors
+- Composer disabled until provider is Ready; in-memory session (documented: lost on process death)
+- Koin: `chatModule` → `ChatEngine` singleton; Claude/Gemini remain honestly Unavailable
+- Shared `defaultModelFor(ProviderId)` used by chat + mission implement phase
+- Unit tests: ready-gate, delta accumulation, stream error, stop/partial, empty draft, provider switch — **94 passing**
 1. Copy this folder into your projects directory.
 2. Open as existing Gradle project (AGP 8.5.2 + Kotlin 1.9.24).
 3. Run `app` on device (minSdk 26).
@@ -76,7 +85,7 @@ Native Android AI coding workstation. No legacy, no stubs wired as real.
 - M3b Mission engine + UI kit + Launch/Detail — **done**
 - M3c Implement/diff/rollback handlers (phases 7–16) — **done**
 - M3d Mission engine UI wiring + premium polish — **done**
-- M4 Chat & Agent UI (streams from M2 adapters)
+- M4 Chat & Agent UI (streams from M2 adapters) — **done**
 - M5 Projects (index, editor, git, build, PTY terminal)
 - M6 Settings & credits polish
 

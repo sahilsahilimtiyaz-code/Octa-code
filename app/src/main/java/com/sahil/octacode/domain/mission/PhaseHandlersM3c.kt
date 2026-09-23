@@ -7,6 +7,7 @@ import com.sahil.octacode.core.provider.ChatMessage
 import com.sahil.octacode.core.provider.ChatRequest
 import com.sahil.octacode.core.provider.ChatRole
 import com.sahil.octacode.core.provider.ProviderId
+import com.sahil.octacode.core.provider.defaultModelFor
 import com.sahil.octacode.data.security.SecretRedactor
 import java.io.File
 import kotlinx.coroutines.CancellationException
@@ -15,12 +16,7 @@ import kotlinx.coroutines.flow.collect
 // M3c phase handlers 7–16: real writes, review gate, skip-honest local steps,
 // process-backed test/build/install when tools exist, snapshot rollback.
 
-private fun modelFor(id: ProviderId): String = when (id) {
-    ProviderId.OPENAI -> "gpt-4o-mini"
-    ProviderId.CUSTOM -> "default"
-    ProviderId.CLAUDE -> "default"
-    ProviderId.GEMINI -> "default"
-}
+private fun modelFor(id: ProviderId): String = defaultModelFor(id)
 
 private fun providerNotReadyReason(status: ProviderStatus): String = when (status) {
     is ProviderStatus.Ready -> "Ready"

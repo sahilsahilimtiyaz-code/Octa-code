@@ -45,6 +45,8 @@ data class ChatMessageUi(
     val author: MessageAuthor,
     val text: String,
     val language: String? = null,
+    val streaming: Boolean = false,
+    val error: String? = null,
 )
 
 data class MissionProgressUi(
