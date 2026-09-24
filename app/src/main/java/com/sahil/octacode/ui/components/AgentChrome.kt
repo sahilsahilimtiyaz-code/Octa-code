@@ -191,23 +191,23 @@ fun AgentStatusPill(
                 RoundedCornerShape(32.dp)
             )
             .clickable(onClick = onProjectClick)
-            .padding(horizontal = 20.dp, vertical = 18.dp),
+            .padding(horizontal = 18.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(
-            modifier = Modifier.weight(1.25f),
+            modifier = Modifier.weight(1.2f),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 Icons.Outlined.Folder,
                 contentDescription = null,
                 tint = Gold,
-                modifier = Modifier.size(30.dp)
+                modifier = Modifier.size(26.dp)
             )
-            Spacer(Modifier.width(14.dp))
+            Spacer(Modifier.width(12.dp))
             Text(
                 text = projectLabel,
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyMedium,
                 color = OnDark,
                 maxLines = 1,
                 modifier = Modifier.weight(1f, fill = true)
@@ -216,14 +216,14 @@ fun AgentStatusPill(
                 Icons.Outlined.KeyboardArrowDown,
                 contentDescription = null,
                 tint = OnDarkMuted,
-                modifier = Modifier.size(22.dp)
+                modifier = Modifier.size(20.dp)
             )
         }
         Box(
             modifier = Modifier
-                .padding(horizontal = 14.dp)
+                .padding(horizontal = 12.dp)
                 .width(1.dp)
-                .height(36.dp)
+                .height(28.dp)
                 .background(Color.White.copy(alpha = 0.14f))
         )
         Row(
@@ -232,14 +232,14 @@ fun AgentStatusPill(
         ) {
             Box(
                 modifier = Modifier
-                    .size(10.dp)
+                    .size(8.dp)
                     .clip(CircleShape)
-                    .background(if (agentReady) NeonGreen else NeonGreen.copy(alpha = 0.85f))
+                    .background(NeonGreen)
             )
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(8.dp))
             Text(
                 text = agentLabel,
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyMedium,
                 color = OnDark,
                 maxLines = 1
             )
@@ -348,43 +348,47 @@ fun AccentInfoCard(
                 RoundedCornerShape(22.dp)
             )
             .clickable(onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 20.dp),
+            .padding(horizontal = 16.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(64.dp)
-                .clip(RoundedCornerShape(18.dp))
+                .size(56.dp)
+                .clip(RoundedCornerShape(16.dp))
                 .background(Color.White.copy(alpha = 0.04f))
-                .border(1.2.dp, accent.copy(alpha = 0.70f), RoundedCornerShape(18.dp)),
+                .border(1.2.dp, accent.copy(alpha = 0.70f), RoundedCornerShape(16.dp)),
             contentAlignment = Alignment.Center
         ) {
             icon()
         }
-        Spacer(Modifier.width(16.dp))
+        Spacer(Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleLarge.copy(
+                style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 19.sp,
-                    lineHeight = 24.sp
+                    fontSize = 18.sp,
+                    lineHeight = 22.sp
                 ),
                 color = OnDark
             )
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(4.dp))
             Text(
                 text = message,
-                style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 21.sp),
-                color = OnDarkMuted
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontSize = 14.sp,
+                    lineHeight = 19.sp
+                ),
+                color = OnDarkMuted,
+                maxLines = 4
             )
         }
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(6.dp))
         Icon(
             Icons.Outlined.ChevronRight,
             contentDescription = null,
             tint = OnDarkMuted,
-            modifier = Modifier.size(28.dp)
+            modifier = Modifier.size(24.dp)
         )
     }
 }
@@ -407,8 +411,8 @@ fun AgentHeroCopy(modifier: Modifier = Modifier) {
             text = "Build Better",
             style = MaterialTheme.typography.displayMedium.copy(
                 fontWeight = FontWeight.Bold,
-                fontSize = 46.sp,
-                lineHeight = 52.sp,
+                fontSize = 42.sp,
+                lineHeight = 46.sp,
                 letterSpacing = (-0.5).sp
             ),
             color = OnDark
@@ -417,16 +421,19 @@ fun AgentHeroCopy(modifier: Modifier = Modifier) {
             text = "Together",
             style = MaterialTheme.typography.displayMedium.copy(
                 fontWeight = FontWeight.Bold,
-                fontSize = 46.sp,
-                lineHeight = 52.sp,
+                fontSize = 42.sp,
+                lineHeight = 46.sp,
                 letterSpacing = (-0.5).sp
             ),
             color = GoldText
         )
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(10.dp))
         Text(
             text = "Your coding conversation and\nmission activity will appear here.",
-            style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 26.sp),
+            style = MaterialTheme.typography.bodyLarge.copy(
+                fontSize = 15.sp,
+                lineHeight = 22.sp
+            ),
             color = OnDarkMuted
         )
     }
@@ -446,23 +453,23 @@ fun ComposerPill(
             .background(Color.White.copy(alpha = 0.03f))
             .border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(28.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         leadingIcon()
-        Spacer(Modifier.width(10.dp))
+        Spacer(Modifier.width(8.dp))
         Text(
             text = label,
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.bodyMedium,
             color = OnDark,
             maxLines = 1
         )
-        Spacer(Modifier.width(4.dp))
+        Spacer(Modifier.width(2.dp))
         Icon(
             Icons.Outlined.KeyboardArrowDown,
             contentDescription = null,
             tint = OnDarkMuted,
-            modifier = Modifier.size(20.dp)
+            modifier = Modifier.size(18.dp)
         )
     }
 }
@@ -476,13 +483,13 @@ fun GoldSendButton(
     modifier: Modifier = Modifier
 ) {
     Box(
-        modifier = modifier.size(56.dp),
+        modifier = modifier.size(48.dp),
         contentAlignment = Alignment.Center
     ) {
         // Outer glow
         Box(
             modifier = Modifier
-                .size(56.dp)
+                .size(48.dp)
                 .clip(CircleShape)
                 .background(
                     Brush.radialGradient(
@@ -496,7 +503,7 @@ fun GoldSendButton(
         )
         Box(
             modifier = Modifier
-                .size(48.dp)
+                .size(42.dp)
                 .clip(CircleShape)
                 .background(
                     if (enabled || busy) {

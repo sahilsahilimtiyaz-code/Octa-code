@@ -94,6 +94,14 @@ Native Android AI coding workstation. No legacy, no stubs wired as real.
 - Spacing/horizontal gutters aligned to mock (20dp page margin)
 - **94 unit tests still passing** (`:app:testDebugUnitTest`)
 
+### M4.3 Compact cards + pinned composer
+- Cards compacted to reference height (56dp icon well, 18sp title, 14sp/19lh body maxLines 4)
+- Status pill, Model/Project pills, gold send button tightened to match mock proportions
+- Composer pinned outside the scrollable column — always visible (attach / files / mic / send row can no longer clip)
+- Hero + planet reduced (200dp / 280dp) so empty state fits with cards and composer on one screen
+- Attach/file/mic use plain boxes (full-opacity icons; disabled IconButton wash-out removed)
+- **94 unit tests still passing** (`:app:testDebugUnitTest`)
+
 ## Setup
 1. Copy this folder into your projects directory.
 2. Open as existing Gradle project (AGP 8.5.2 + Kotlin 1.9.24).

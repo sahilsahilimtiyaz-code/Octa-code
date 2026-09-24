@@ -2,6 +2,7 @@ package com.sahil.octacode.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,25 +11,27 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.SmartToy
 import androidx.compose.material.icons.outlined.TrackChanges
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.foundation.text.BasicTextField
@@ -45,7 +48,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sahil.octacode.core.capability.ProviderStatus
@@ -72,8 +74,7 @@ import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
 /**
- * Agent workspace — structure matched to the reference:
- * top bar · status pill · hero+planet · status cards · gold composer.
+ * Agent workspace — reference layout with composer pinned to the bottom.
  * Streaming still comes from real ChatEngine / M2 adapters.
  */
 @Composable
@@ -130,124 +131,129 @@ fun ChatScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        Box(modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
-            AgentTopBar(
-                onMenu = onOpenMenu,
-                onSearch = {},
-                onNotifications = {},
-                onProfile = onOpenProfile
+        // —— header + status + content (scrollable) ————————————————
+        Column(
+            modifier = Modifier
+                .weight(1f, fill = true)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+        ) {
+            Box(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+                AgentTopBar(
+                    onMenu = onOpenMenu,
+                    onSearch = {},
+                    onNotifications = {},
+                    onProfile = onOpenProfile
+                )
+            }
+
+            AgentStatusPill(
+                projectLabel = "No project selected",
+                agentLabel = agentLabel,
+                agentReady = ready,
+                onProjectClick = onOpenProjects,
+                modifier = Modifier.padding(horizontal = 20.dp)
             )
-        }
 
-        AgentStatusPill(
-            projectLabel = "No project selected",
-            agentLabel = agentLabel,
-            agentReady = ready,
-            onProjectClick = onOpenProjects,
-            modifier = Modifier.padding(horizontal = 20.dp)
-        )
-
-        if (state.turns.isEmpty()) {
-            // —— reference empty / hero state ————————————————————
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(250.dp)
-                    .padding(top = 18.dp)
-            ) {
-                HeroPlanet(
+            if (state.turns.isEmpty()) {
+                Box(
                     modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .size(340.dp)
-                        .padding(end = 0.dp)
-                )
-                AgentHeroCopy(
+                        .fillMaxWidth()
+                        .height(200.dp)
+                        .padding(top = 8.dp)
+                ) {
+                    HeroPlanet(
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .size(280.dp)
+                    )
+                    AgentHeroCopy(
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .padding(start = 20.dp, end = 120.dp)
+                    )
+                }
+
+                Column(
+                    modifier = Modifier.padding(horizontal = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    AccentInfoCard(
+                        title = if (ready) "Agent ready" else "Agent unavailable",
+                        message = if (ready) {
+                            "Provider ${state.selectedProvider.title} is configured. Type a message to start a real streamed session."
+                        } else {
+                            "No provider or local agent runtime is connected. Configure Model & Provider from the menu before starting a session."
+                        },
+                        accent = Gold,
+                        onClick = { scope.launch { engine.refreshProviderStatus() } },
+                        icon = {
+                            Icon(
+                                Icons.Outlined.SmartToy,
+                                contentDescription = null,
+                                tint = Gold,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                    )
+
+                    AccentInfoCard(
+                        title = "Mission activity",
+                        message = missionNote,
+                        accent = NeonBlue,
+                        onClick = onOpenProjects,
+                        icon = {
+                            Icon(
+                                Icons.Outlined.TrackChanges,
+                                contentDescription = null,
+                                tint = NeonBlue,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            } else {
+                LazyColumn(
+                    state = listState,
                     modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .padding(start = 20.dp, end = 140.dp)
-                )
-            }
-
-            Column(
-                modifier = Modifier.padding(horizontal = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                AccentInfoCard(
-                    title = if (ready) "Agent ready" else "Agent unavailable",
-                    message = if (ready) {
-                        "Provider ${state.selectedProvider.title} is configured. Type a message to start a real streamed session."
-                    } else {
-                        "No provider or local agent runtime is connected. Configure Model & Provider from the menu before starting a session."
-                    },
-                    accent = Gold,
-                    onClick = { scope.launch { engine.refreshProviderStatus() } },
-                    icon = {
-                        Icon(
-                            Icons.Outlined.SmartToy,
-                            contentDescription = null,
-                            tint = Gold,
-                            modifier = Modifier.size(32.dp)
-                        )
+                        .fillMaxWidth()
+                        .heightIn(min = 200.dp, max = 480.dp)
+                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(state.turns, key = { it.id }) { turn ->
+                        ChatBubble(turn = turn)
                     }
-                )
-
-                AccentInfoCard(
-                    title = "Mission activity",
-                    message = missionNote,
-                    accent = NeonBlue,
-                    onClick = onOpenProjects,
-                    icon = {
-                        Icon(
-                            Icons.Outlined.TrackChanges,
-                            contentDescription = null,
-                            tint = NeonBlue,
-                            modifier = Modifier.size(32.dp)
-                        )
+                }
+                if (state.busy && state.streamingText.isNullOrEmpty()) {
+                    Box(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)) {
+                        ThinkingOrb(label = "Waiting for provider...")
                     }
-                )
-            }
-
-            Spacer(modifier = Modifier.weight(1f))
-        } else {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(state.turns, key = { it.id }) { turn ->
-                    ChatBubble(turn = turn)
                 }
             }
-            if (state.busy && state.streamingText.isNullOrEmpty()) {
-                Box(modifier = Modifier.padding(bottom = 8.dp)) {
-                    ThinkingOrb(label = "Waiting for provider...")
-                }
+
+            state.lastError?.let { err ->
+                Text(
+                    text = err,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = WarningAmber,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
+                )
             }
         }
 
-        state.lastError?.let { err ->
-            Text(
-                text = err,
-                style = MaterialTheme.typography.bodySmall,
-                color = WarningAmber,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
-            )
-        }
-
-        // —— composer (reference bottom panel) ————————————————————
+        // —— composer pinned to bottom (always visible) ————————————
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 12.dp)
-                .clip(RoundedCornerShape(24.dp))
+                .padding(horizontal = 20.dp, vertical = 10.dp)
+                .clip(RoundedCornerShape(20.dp))
                 .background(
                     Brush.verticalGradient(
                         listOf(
-                            Color.White.copy(alpha = 0.055f),
-                            Color.White.copy(alpha = 0.025f)
+                            Color.White.copy(alpha = 0.05f),
+                            Color.White.copy(alpha = 0.02f)
                         )
                     )
                 )
@@ -261,14 +267,14 @@ fun ChatScreen(
                             NeonBlue.copy(alpha = 0.85f)
                         )
                     ),
-                    RoundedCornerShape(24.dp)
+                    RoundedCornerShape(20.dp)
                 )
-                .padding(horizontal = 16.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Box(modifier = Modifier.weight(1.55f)) {
                     ComposerPill(
@@ -278,7 +284,7 @@ fun ChatScreen(
                                 Icons.Outlined.Layers,
                                 contentDescription = null,
                                 tint = NeonBlue,
-                                modifier = Modifier.size(22.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         },
                         onClick = { providerMenu = true },
@@ -317,7 +323,7 @@ fun ChatScreen(
                                 Icons.Outlined.Folder,
                                 contentDescription = null,
                                 tint = NeonBlue,
-                                modifier = Modifier.size(22.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         },
                         onClick = { projectMenu = true },
@@ -338,54 +344,72 @@ fun ChatScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(30.dp))
-                    .background(Color.White.copy(alpha = 0.03f))
-                    .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(30.dp))
-                    .padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(Color.White.copy(alpha = 0.035f))
+                    .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(28.dp))
+                    .padding(start = 4.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = {}, enabled = false) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clickable { }
+                        .padding(8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
                     Icon(
                         Icons.Filled.AttachFile,
                         contentDescription = "Attach",
                         tint = OnDarkMuted,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-                IconButton(onClick = {}, enabled = false) {
-                    Icon(
-                        Icons.Filled.Description,
-                        contentDescription = "File",
-                        tint = OnDarkMuted,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-                IconButton(onClick = {}, enabled = false) {
-                    Icon(
-                        Icons.Filled.Mic,
-                        contentDescription = "Voice",
-                        tint = OnDarkMuted,
-                        modifier = Modifier.size(22.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
                 Box(
                     modifier = Modifier
-                        .padding(horizontal = 4.dp)
+                        .size(40.dp)
+                        .clickable { }
+                        .padding(8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Filled.Description,
+                        contentDescription = "Files",
+                        tint = OnDarkMuted,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clickable { }
+                        .padding(8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Filled.Mic,
+                        contentDescription = "Voice",
+                        tint = OnDarkMuted,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = 2.dp)
                         .width(1.dp)
-                        .height(28.dp)
+                        .height(26.dp)
                         .background(Color.White.copy(alpha = 0.18f))
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(6.dp))
                 BasicTextField(
                     value = draft,
                     onValueChange = { draft = it },
                     modifier = Modifier
                         .weight(1f)
-                        .padding(vertical = 10.dp),
+                        .padding(vertical = 8.dp),
                     enabled = !state.busy,
                     textStyle = MaterialTheme.typography.bodyLarge.copy(
                         color = OnDark,
-                        fontSize = 16.sp
+                        fontSize = 15.sp
                     ),
                     cursorBrush = Brush.linearGradient(listOf(Gold, GoldBright)),
                     singleLine = true,
@@ -394,7 +418,7 @@ fun ChatScreen(
                             if (draft.isEmpty()) {
                                 Text(
                                     text = "Type a message...",
-                                    style = MaterialTheme.typography.bodyLarge,
+                                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp),
                                     color = OnDarkMuted
                                 )
                             }
@@ -402,7 +426,7 @@ fun ChatScreen(
                         }
                     }
                 )
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(4.dp))
                 GoldSendButton(
                     enabled = draft.isNotBlank() && ready && !state.busy,
                     busy = state.busy,
@@ -422,7 +446,7 @@ fun ChatScreen(
                     ready -> "In-memory session - lost on process death"
                     else -> "Connect a provider or local runtime to send a message."
                 },
-                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp),
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
                 color = OnDarkMuted
             )
         }
