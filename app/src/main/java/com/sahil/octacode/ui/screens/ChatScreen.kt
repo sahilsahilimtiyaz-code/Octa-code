@@ -320,24 +320,13 @@ fun ChatScreen(
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp, vertical = 10.dp)
                 .clip(RoundedCornerShape(20.dp))
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            Color.White.copy(alpha = 0.05f),
-                            Color.White.copy(alpha = 0.02f)
-                        )
-                    )
-                )
+                // Flat surface colour, neutral border: the controls sitting
+                // inside it carry the affordance, so the container should not
+                // out-shout what it contains.
+                .background(Color.White.copy(alpha = 0.04f))
                 .border(
                     1.5.dp,
-                    Brush.horizontalGradient(
-                        listOf(
-                            NeonBlue.copy(alpha = 0.90f),
-                            NeonBlue.copy(alpha = 0.35f),
-                            ElectricPurple.copy(alpha = 0.55f),
-                            ElectricPurple.copy(alpha = 0.95f)
-                        )
-                    ),
+                    Color.White.copy(alpha = 0.10f),
                     RoundedCornerShape(20.dp)
                 )
                 .padding(horizontal = 14.dp, vertical = 14.dp),
@@ -392,20 +381,12 @@ fun ChatScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(28.dp))
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(Color.White.copy(alpha = 0.035f), NeonBlue.copy(alpha = 0.05f))
-                        )
-                    )
+                    .background(Color.White.copy(alpha = 0.04f))
+                    // The mid-stop of the sweep it replaces: an input field
+                    // should look like a field, not like a lit edge.
                     .border(
                         1.dp,
-                        Brush.horizontalGradient(
-                            listOf(
-                                NeonBlue.copy(alpha = 0.50f),
-                                Color.White.copy(alpha = 0.14f),
-                                ElectricPurple.copy(alpha = 0.45f)
-                            )
-                        ),
+                        Color.White.copy(alpha = 0.14f),
                         RoundedCornerShape(28.dp)
                     )
                     .padding(start = 4.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),

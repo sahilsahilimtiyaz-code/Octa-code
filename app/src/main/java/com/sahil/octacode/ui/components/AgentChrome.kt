@@ -180,13 +180,10 @@ fun AgentStatusPill(
             .background(Color.White.copy(alpha = 0.035f))
             .border(
                 1.dp,
-                Brush.horizontalGradient(
-                    listOf(
-                        BubblePink.copy(alpha = 0.55f),
-                        Color.White.copy(alpha = 0.10f),
-                        NeonBlue.copy(alpha = 0.28f)
-                    )
-                ),
+                // One flat edge colour. The pink-to-cyan sweep across a status
+                // pill drew more attention to the chrome than to the status it
+                // was reporting.
+                Color.White.copy(alpha = 0.10f),
                 RoundedCornerShape(32.dp)
             )
             .clickable(onClick = onProjectClick)
@@ -327,23 +324,13 @@ fun AccentInfoCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(22.dp))
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        Color.White.copy(alpha = 0.05f),
-                        Color.White.copy(alpha = 0.02f)
-                    )
-                )
-            )
+            .background(Color.White.copy(alpha = 0.04f))
             .border(
                 1.5.dp,
-                Brush.horizontalGradient(
-                    listOf(
-                        accent.copy(alpha = 0.95f),
-                        accent.copy(alpha = 0.70f),
-                        accent.copy(alpha = 0.40f)
-                    )
-                ),
+                // Solid accent rather than one that fades across the card: the
+                // inner icon box below already uses a flat accent border, so
+                // this now reads as one component instead of two treatments.
+                accent.copy(alpha = 0.80f),
                 RoundedCornerShape(22.dp)
             )
             .clickable(onClick = onClick)
@@ -473,7 +460,7 @@ fun ComposerPill(
     }
 }
 
-/** Circular neon send / stop control with a gradient glow ring. */
+/** Circular send / stop control: a flat ringed button, no glow behind it. */
 @Composable
 fun NeonSendButton(
     enabled: Boolean,
@@ -491,48 +478,17 @@ fun NeonSendButton(
         modifier = modifier.size(48.dp),
         contentAlignment = Alignment.Center
     ) {
-        // Outer glow
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(
-                            NeonBlue.copy(alpha = if (enabled || busy) 0.45f else 0.22f),
-                            NeonBlue.copy(alpha = 0.10f),
-                            Color.Transparent
-                        )
-                    )
-                )
-        )
+        // Deliberately no halo behind it. A glow here made a tappable target
+        // read as a light source rather than something to press; state is
+        // carried by the border and the icon instead.
         Box(
             modifier = Modifier
                 .size(42.dp)
                 .clip(CircleShape)
-                .background(
-                    if (enabled || busy) {
-                        Brush.radialGradient(
-                            colors = listOf(NeonBlueBright.copy(alpha = 0.35f), Color(0xFF0B1A2E), Color(0xFF0A0A16))
-                        )
-                    } else {
-                        Brush.radialGradient(
-                            colors = listOf(Color.White.copy(alpha = 0.10f), Color(0xFF0C0C14))
-                        )
-                    }
-                )
+                .background(if (enabled || busy) Color(0xFF0B1A2E) else Color(0xFF0C0C14))
                 .border(
                     1.8.dp,
-                    if (enabled || busy) {
-                        Brush.linearGradient(listOf(NeonBlueBright, NeonBlue, ElectricPurple))
-                    } else {
-                        Brush.linearGradient(
-                            listOf(
-                                NeonBlue.copy(alpha = 0.55f),
-                                ElectricPurple.copy(alpha = 0.35f)
-                            )
-                        )
-                    },
+                    if (enabled || busy) NeonBlue else NeonBlue.copy(alpha = 0.35f),
                     CircleShape
                 )
                 .clickable(

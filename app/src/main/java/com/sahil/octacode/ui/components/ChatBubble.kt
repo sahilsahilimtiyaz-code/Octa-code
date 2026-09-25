@@ -27,7 +27,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.sahil.octacode.domain.chat.ChatAuthor
 import com.sahil.octacode.domain.chat.ChatTurn
-import com.sahil.octacode.ui.theme.BubblePink
 import com.sahil.octacode.ui.theme.ElectricPurple
 import com.sahil.octacode.ui.theme.NeonBlue
 import com.sahil.octacode.ui.theme.NeonGreen
@@ -102,14 +101,13 @@ private fun UserBubble(turn: ChatTurn) {
         modifier = Modifier
             .widthIn(max = 300.dp)
             .clip(BubbleShape)
-            .background(
-                Brush.horizontalGradient(
-                    listOf(NeonBlue.copy(alpha = 0.16f), BubblePink.copy(alpha = 0.12f)),
-                ),
-            )
+            // Flat tint and a single border colour. The blue-to-pink sweep
+            // across every outgoing message made the user's own text the most
+            // decorated thing on screen, competing with the response below it.
+            .background(NeonBlue.copy(alpha = 0.14f))
             .border(
                 width = 1.5.dp,
-                brush = Brush.horizontalGradient(listOf(NeonBlue, BubblePink)),
+                color = NeonBlue.copy(alpha = 0.55f),
                 shape = BubbleShape,
             ),
     ) {

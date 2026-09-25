@@ -31,7 +31,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -46,7 +45,6 @@ import com.sahil.octacode.ui.motion.LocalMotionPolicy
 import com.sahil.octacode.ui.motion.rememberSystemMotionPolicy
 import com.sahil.octacode.ui.navigation.OctaNavGraph
 import com.sahil.octacode.ui.navigation.Routes
-import com.sahil.octacode.ui.theme.ElectricPurple
 import com.sahil.octacode.ui.theme.NeonBlue
 import com.sahil.octacode.ui.theme.NeonBlueBright
 import com.sahil.octacode.ui.theme.OctaCodeTheme
@@ -152,19 +150,13 @@ private fun AgentBottomBar(
                         .then(
                             if (selected) {
                                 Modifier
-                                    .background(
-                                        Brush.horizontalGradient(
-                                            listOf(
-                                                NeonBlue.copy(alpha = 0.18f),
-                                                NeonBlueBright.copy(alpha = 0.10f)
-                                            )
-                                        )
-                                    )
+                                    // Solid tint rather than a gradient sweep: a
+                                    // control reads as a control, not as a light
+                                    // source, and selection is still unmissable.
+                                    .background(NeonBlue.copy(alpha = 0.12f))
                                     .border(
                                         1.5.dp,
-                                        Brush.horizontalGradient(
-                                            listOf(NeonBlueBright, ElectricPurple)
-                                        ),
+                                        NeonBlue.copy(alpha = 0.55f),
                                         RoundedCornerShape(16.dp)
                                     )
                             } else {
@@ -196,9 +188,7 @@ private fun AgentBottomBar(
                         .width(if (selected) 48.dp else 0.dp)
                         .height(if (selected) 2.5.dp else 0.dp)
                         .background(
-                            if (selected) Brush.horizontalGradient(
-                                listOf(NeonBlue.copy(alpha = 0.2f), NeonBlueBright, NeonBlue.copy(alpha = 0.2f))
-                            ) else Brush.horizontalGradient(listOf(Color.Transparent, Color.Transparent)),
+                            if (selected) NeonBlueBright else Color.Transparent,
                             RoundedCornerShape(2.dp)
                         )
                 )
