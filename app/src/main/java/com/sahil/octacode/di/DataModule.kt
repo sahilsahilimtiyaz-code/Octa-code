@@ -6,6 +6,7 @@ import com.sahil.octacode.data.mission.MissionDiffDao
 import com.sahil.octacode.data.mission.PhaseEventDao
 import com.sahil.octacode.data.mission.PhaseRunDao
 import com.sahil.octacode.data.mission.RoomMissionRepository
+import com.sahil.octacode.data.settings.SettingsRepository
 import com.sahil.octacode.domain.mission.MissionRepository
 import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
@@ -27,4 +28,8 @@ val dataModule = module {
             missionDiffDao = get()
         )
     }
+
+    // App settings: one store, read as a flow by every screen. Registered here
+    // rather than in AppModule because it is persistence, not presentation.
+    single<SettingsRepository> { SettingsRepository(androidContext()) }
 }
