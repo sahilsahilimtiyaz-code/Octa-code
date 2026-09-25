@@ -31,6 +31,16 @@ interface ChatRepository {
     /** Titles start as an excerpt of the first message; users may rename later. */
     suspend fun renameSession(sessionId: String, title: String)
 
+    /**
+     * Archive or restore. [at] is null to restore — passing a timestamp keeps
+     * *when* the decision was made, which is what "archive after 7 days of
+     * inactivity" is ultimately about.
+     */
+    suspend fun setArchived(sessionId: String, at: Long?)
+
+    /** Archives several at once; a retention pass must not be N round trips. */
+    suspend fun setArchived(sessionIds: Collection<String>, at: Long)
+
     /** Deleting a session deletes its turns — no orphaned history is kept. */
     suspend fun deleteSession(sessionId: String)
 }

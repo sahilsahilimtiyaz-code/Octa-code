@@ -17,7 +17,16 @@ data class ChatSession(
     val profile: RunProfile,
     val createdAt: Long,
     val lastMessageAt: Long,
-)
+    /**
+     * When the session was archived, or null if active. Separate from
+     * [lastMessageAt] on purpose: archiving is a decision someone (or a
+     * policy) made, and overwriting the activity time would make an archived
+     * chat look freshly used — or hide how long it had actually been idle.
+     */
+    val archivedAt: Long? = null,
+) {
+    val isActive: Boolean get() = archivedAt == null
+}
 
 /**
  * One turn as stored. Separate from [ChatTurn], which is the live rendering

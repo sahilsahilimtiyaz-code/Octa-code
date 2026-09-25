@@ -5,7 +5,9 @@ import com.sahil.octacode.domain.chat.ChatAuthor
 import com.sahil.octacode.domain.chat.ChatSession
 import com.sahil.octacode.domain.chat.StoredTurn
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 
@@ -83,6 +85,38 @@ class ChatMappersTest {
 
         assertEquals(1_111L, session.createdAt)
         assertEquals(9_999L, session.lastMessageAt)
+    }
+
+    @Test
+    fun `archivedAt survives the round trip so a retention decision is not lost`() {
+        val session = ChatSession(
+            id = "s-5",
+            title = "t",
+            profile = profile,
+            createdAt = 1L,
+            lastMessageAt = 2L,
+            archivedAt = 4_242L,
+        )
+
+        val restored = session.toEntity().toDomain()
+
+        assertEquals(4_242L, restored.archivedAt)
+        assertFalse("an archived session must not report as active", restored.isActive)
+        assertEquals(session, restored)
+    }
+
+    @Test
+    fun `a session with no archivedAt round trips as null rather than a default timestamp`() {
+        val restored = ChatSession(
+            id = "s-6",
+            title = "t",
+            profile = profile,
+            createdAt = 1L,
+            lastMessageAt = 2L,
+        ).toEntity().toDomain()
+
+        assertNull(restored.archivedAt)
+        assertTrue(restored.isActive)
     }
 
     // --- turns ----------------------------------------------------------------

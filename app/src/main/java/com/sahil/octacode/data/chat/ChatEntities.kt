@@ -29,6 +29,8 @@ data class ChatSessionEntity(
     val workspaceId: String?,
     val createdAt: Long,
     val lastMessageAt: Long,
+    /** NULL in SQL means active — the same convention as the domain model. */
+    val archivedAt: Long?,
 )
 
 /**
@@ -73,6 +75,7 @@ internal fun ChatSession.toEntity() = ChatSessionEntity(
     workspaceId = profile.workspaceId,
     createdAt = createdAt,
     lastMessageAt = lastMessageAt,
+    archivedAt = archivedAt,
 )
 
 internal fun ChatSessionEntity.toDomain() = ChatSession(
@@ -86,6 +89,7 @@ internal fun ChatSessionEntity.toDomain() = ChatSession(
     ),
     createdAt = createdAt,
     lastMessageAt = lastMessageAt,
+    archivedAt = archivedAt,
 )
 
 internal fun StoredTurn.toEntity() = ChatTurnEntity(

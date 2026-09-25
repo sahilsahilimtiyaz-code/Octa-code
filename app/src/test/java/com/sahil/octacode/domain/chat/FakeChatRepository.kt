@@ -74,6 +74,22 @@ internal class FakeChatRepository : ChatRepository {
         publish()
     }
 
+    override suspend fun setArchived(sessionId: String, at: Long?) {
+        failWritesWith?.let { throw IllegalStateException(it) }
+        val session = sessionById[sessionId] ?: return
+        sessionById[sessionId] = session.copy(archivedAt = at)
+        publish()
+    }
+
+    override suspend fun setArchived(sessionIds: Collection<String>, at: Long) {
+        if (sessionIds.isEmpty()) return
+        failWritesWith?.let { throw IllegalStateException(it) }
+        sessionIds.forEach { id ->
+            sessionById[id]?.let { sessionById[id] = it.copy(archivedAt = at) }
+        }
+        publish()
+    }
+
     override suspend fun deleteSession(sessionId: String) {
         failWritesWith?.let { throw IllegalStateException(it) }
         sessionById.remove(sessionId)
@@ -87,5 +103,17 @@ internal class FakeChatRepository : ChatRepository {
         _sessions.value = sessionOrder
             .mapNotNull { sessionById[it] }
             .sortedByDescending { it.lastMessageAt }
+    }
+
+    /**
+     * Insert a fully-specified session. Policy tests need control over
+     * `lastMessageAt` and `archivedAt`, which the public API generates.
+     */
+    suspend fun seed(session: ChatSession) {
+        failWritesWith?.let { throw IllegalStateException(it) }
+        sessionById[session.id] = session
+        if (session.id !in sessionOrder) sessionOrder += session.id
+        turnsById.putIfAbsent(session.id, mutableListOf())
+        publish()
     }
 }

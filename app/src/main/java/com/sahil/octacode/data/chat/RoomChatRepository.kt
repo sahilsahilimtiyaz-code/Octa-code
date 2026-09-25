@@ -54,6 +54,15 @@ class RoomChatRepository(
         dao.renameSession(sessionId, title)
     }
 
+    override suspend fun setArchived(sessionId: String, at: Long?) {
+        dao.setArchived(sessionId, at)
+    }
+
+    override suspend fun setArchived(sessionIds: Collection<String>, at: Long) {
+        if (sessionIds.isEmpty()) return
+        dao.setArchivedMany(sessionIds, at)
+    }
+
     override suspend fun deleteSession(sessionId: String) {
         dao.deleteSession(sessionId)
     }

@@ -28,6 +28,18 @@ interface ChatDao {
     @Query("UPDATE chat_sessions SET title = :title WHERE id = :id")
     suspend fun renameSession(id: String, title: String)
 
+    /**
+     * Sets or clears [ChatSession.archivedAt] without touching
+     * `lastMessageAt`, so archiving never rewrites when the conversation was
+     * last active — retention decisions stay reversible and auditable.
+     */
+    @Query("UPDATE chat_sessions SET archivedAt = :at WHERE id = :id")
+    suspend fun setArchived(id: String, at: Long?)
+
+    /** Batch form, so a retention pass is one statement rather than N. */
+    @Query("UPDATE chat_sessions SET archivedAt = :at WHERE id IN (:ids)")
+    suspend fun setArchivedMany(ids: Collection<String>, at: Long)
+
     @Query("DELETE FROM chat_sessions WHERE id = :id")
     suspend fun deleteSession(id: String)
 
