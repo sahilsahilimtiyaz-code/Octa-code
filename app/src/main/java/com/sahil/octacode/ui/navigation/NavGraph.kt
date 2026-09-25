@@ -11,6 +11,7 @@ import com.sahil.octacode.ui.screens.HomeScreen
 import com.sahil.octacode.ui.screens.MissionDetailScreen
 import com.sahil.octacode.ui.screens.MissionLaunchScreen
 import com.sahil.octacode.ui.screens.ProjectsScreen
+import com.sahil.octacode.ui.screens.RuntimeScreen
 import com.sahil.octacode.ui.screens.SettingsScreen
 import com.sahil.octacode.ui.screens.SplashScreen
 import com.sahil.octacode.ui.screens.TerminalScreen
@@ -41,7 +42,12 @@ fun OctaNavGraph(navController: NavHostController) {
         }
         composable(Routes.PROJECTS) { ProjectsScreen() }
         composable(Routes.TERMINAL) { TerminalScreen() }
-        composable(Routes.SETTINGS) { SettingsScreen() }
+        composable(Routes.SETTINGS) {
+            SettingsScreen(onOpenRuntime = { navController.navigate(Routes.RUNTIME) })
+        }
+        composable(Routes.RUNTIME) {
+            RuntimeScreen(onBack = { navController.popBackStack() })
+        }
         composable(Routes.MISSION_LAUNCH) {
             MissionLaunchScreen(
                 onBack = { navController.popBackStack() },

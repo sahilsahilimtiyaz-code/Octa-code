@@ -9,6 +9,7 @@ object Routes {
     const val PROJECTS = "projects"
     const val TERMINAL = "terminal"
     const val SETTINGS = "settings"
+    const val RUNTIME = "runtime"
 
     const val MISSION_LAUNCH = "mission/launch"
     const val MISSION_DETAIL_PATTERN = "mission/{missionId}"

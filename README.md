@@ -102,6 +102,38 @@ Native Android AI coding workstation. No legacy, no stubs wired as real.
 - Attach/file/mic use plain boxes (full-opacity icons; disabled IconButton wash-out removed)
 - **94 unit tests still passing** (`:app:testDebugUnitTest`)
 
+### R1 Runtime provisioning (the download layer)
+- `tools/gen_runtime_manifest.py` — reproducible generator that reads the live Termux apt
+  index and freezes each package's URL, size and SHA-256 into the APK. Re-run to refresh;
+  `--check` fails if the committed asset is stale.
+- Bundled `assets/runtime-manifest.json` — **78 pinned arm64 artifacts (264MB)** in six
+  independent groups: base userland 14.8MB · PRoot 0.1MB · Node 24 23.9MB · Python 3.14 10.0MB
+  · dev tools 23.2MB · **Rust 219MB (optional)**. Install one group = download only what it
+  still needs (closures overlap and are deduped against the ledger).
+- Manifest ships **inside the APK** — a compromised mirror cannot widen what the app accepts.
+- `ArtifactDownloader` — streams to disk, `Range`-resumes partials, computes SHA-256 over the
+  bytes actually written (including a resumed prefix). A mismatch **deletes the file** and
+  reports expected vs received; a complete-but-wrong file restarts instead of resuming;
+  429/5xx retry through the existing `RetryPolicy`, other statuses fail at once; cancellation
+  is never reported as a failure.
+- Dedicated download client in `KtorHttpFactory` — the shared client's 90s request timeout
+  covers the response *body*, which would kill a 125MB download mid-flight.
+- `RuntimeLedger` — atomic (tmp + rename) JSON record of what was proven. An unreadable
+  ledger starts **empty** and says so: cached artifacts are then re-verified offline by
+  hashing them, so damage costs a re-check, never a re-download and never a free pass.
+- `RuntimeProvisioner` — one group at a time, publishes busy state before the coroutine
+  starts, stops at the first failure with the real reason, keeps bytes on Stop so the next
+  run resumes.
+- **Runtime screen** (Settings → Runtime): pinned-source panel, per-group Install / Stop /
+  Re-verify with real byte progress, honest "n/m verified · X to download", ABI gate that
+  refuses to download anything on a non-arm64 device, delete-all.
+- Still honest about the milestone: artifacts are **fetched and verified** here; unpacking
+  them into a working shell and wiring them into `which()` is R2/R3. No tool is reported
+  available until it actually is.
+- Unit tests: manifest pin validation, downloader (fresh / resume / mismatch / truncated /
+  reuse-without-network / retry / 404), ledger (round-trip / corruption / atomicity),
+  provisioner end-to-end (install / idempotent / stop-on-failure / mismatch / offline re-verify).
+
 ## Setup
 1. Copy this folder into your projects directory.
 2. Open as existing Gradle project (AGP 8.5.2 + Kotlin 1.9.24).
@@ -115,6 +147,15 @@ Native Android AI coding workstation. No legacy, no stubs wired as real.
 - M4 Chat & Agent UI (streams from M2 adapters) — **done**
 - M5 Projects (index, editor, git, build, PTY terminal)
 - M6 Settings & credits polish
+
+### Runtime (on-device coding environment)
+- **R1** Pinned manifest + downloader + verification ledger + Runtime screen — **done**
+- **R2** Unpack `.deb` → `$PREFIX`, `RuntimeIndex` teaching `which()` about runtime tools
+- **R3** Exec bootstrap (jniLibs `lib*.so` + PRoot) — Android 10+ W^X compliance
+- **R4** PRoot rootfs + base userland → real shell in Terminal
+- **R5** Node/npm → install OpenCode / Claude Code CLI → stream into Chat
+- **R6** Python + dev tools + project import (git clone / SAF / zip) — M5
+- **R7** Rust on demand + foreground service / Doze exemption for background agents
 
 ## Honesty principle
 No fake integrations, agents, tool calls, or success messages. Unavailable = "Unavailable" + reason.

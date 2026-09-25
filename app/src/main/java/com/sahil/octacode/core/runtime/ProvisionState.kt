@@ -1,0 +1,53 @@
+package com.sahil.octacode.core.runtime
+
+/** Live progress of a single group install. All byte counts are real, never estimated. */
+data class GroupProgress(
+    val groupId: String,
+    val itemId: String,
+    /** 1-based position of the current artifact within this run. */
+    val itemIndex: Int,
+    val itemCount: Int,
+    val itemBytesDone: Long,
+    val itemBytesTotal: Long,
+    /** Bytes verified so far across the whole group run. */
+    val groupBytesDone: Long,
+    val groupBytesTotal: Long
+) {
+    val itemFraction: Float
+        get() = if (itemBytesTotal <= 0) 0f else (itemBytesDone.toFloat() / itemBytesTotal).coerceIn(0f, 1f)
+
+    val groupFraction: Float
+        get() = if (groupBytesTotal <= 0) 0f else (groupBytesDone.toFloat() / groupBytesTotal).coerceIn(0f, 1f)
+}
+
+/** Why a group install stopped. Always shown to the user — no silent failure. */
+data class ProvisionError(
+    /** null = a problem that belongs to no single group (e.g. a damaged ledger). */
+    val groupId: String?,
+    val itemId: String?,
+    val reason: String,
+    val retryable: Boolean
+)
+
+data class ProvisionerState(
+    val busy: Boolean = false,
+    val activeGroupId: String? = null,
+    val progress: GroupProgress? = null,
+    /** artifact id → verification record (mirrors the ledger). */
+    val fetched: Map<String, ArtifactRecord> = emptyMap(),
+    val lastError: ProvisionError? = null
+) {
+    fun isFetched(artifactId: String): Boolean = fetched.containsKey(artifactId)
+
+    fun fetchedCount(group: RuntimeGroup): Int = group.items.count { fetched.containsKey(it.id) }
+
+    fun totalFetchedBytes(): Long = fetched.values.sumOf { it.bytes }
+
+    /** Bytes still to download for a group — what the button will actually cost. */
+    fun pendingBytes(group: RuntimeGroup): Long =
+        group.items.filterNot { fetched.containsKey(it.id) }.sumOf { it.size }
+
+    fun pendingCount(group: RuntimeGroup): Int = group.items.count { !fetched.containsKey(it.id) }
+
+    fun isComplete(group: RuntimeGroup): Boolean = pendingCount(group) == 0
+}

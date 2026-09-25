@@ -45,7 +45,8 @@ import org.koin.compose.koinInject
 @Composable
 fun SettingsScreen(
     registry: CapabilityRegistry = koinInject(),
-    credentials: CredentialStore = koinInject()
+    credentials: CredentialStore = koinInject(),
+    onOpenRuntime: () -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
     var statuses by remember { mutableStateOf<Map<ProviderId, ProviderStatus>>(emptyMap()) }
@@ -91,6 +92,21 @@ fun SettingsScreen(
 
         Text("Autonomy", style = MaterialTheme.typography.titleMedium)
         AutonomyPicker(autonomy) { registry.setAutonomy(it) }
+
+        Text("Runtime", style = MaterialTheme.typography.titleMedium)
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Coding runtime", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "Fetch bash, Node.js, Python, PRoot and dev tools from pinned mirrors. " +
+                        "Each artifact is checked against a SHA-256 that ships inside the APK.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                OutlinedButton(onClick = onOpenRuntime, modifier = Modifier.fillMaxWidth()) {
+                    Text("Open runtime manager")
+                }
+            }
+        }
 
         Text(
             "Dangerous actions require approval at ASK level (default). " +

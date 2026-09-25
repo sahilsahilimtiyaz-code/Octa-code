@@ -36,4 +36,20 @@ object KtorHttpFactory {
             socketTimeoutMillis = 90_000
         }
     }
+
+    /**
+     * Client for runtime artifact downloads (R1).
+     *
+     * Deliberately separate from [create]: Ktor's requestTimeout covers the whole
+     * response BODY, so the default 90s would kill a 125MB download mid-flight.
+     * Here there is no overall cap — a download ends when the bytes end, and a dead
+     * link is detected by the idle socket timeout instead.
+     */
+    fun createDownloadClient(): HttpClient = HttpClient(OkHttp) {
+        install(HttpTimeout) {
+            requestTimeoutMillis = 0L // size is unbounded; no wall-clock cap
+            connectTimeoutMillis = 15_000
+            socketTimeoutMillis = 60_000 // no bytes for 60s → link is dead
+        }
+    }
 }
