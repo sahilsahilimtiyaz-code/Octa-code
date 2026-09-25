@@ -88,6 +88,9 @@ fun ChatScreen(
     val state by engine.state.collectAsState()
     var draft by remember { mutableStateOf("") }
     var providerMenu by remember { mutableStateOf(false) }
+    // Set when send is tapped while the provider is not ready, so the caption
+    // under the composer can escalate from a hint to the actual reason.
+    var sendBlocked by remember { mutableStateOf(false) }
     var projectMenu by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -186,7 +189,15 @@ fun ChatScreen(
                             "No provider or local agent runtime is connected. Configure Model & Provider from the menu before starting a session."
                         },
                         accent = Gold,
-                        onClick = { scope.launch { engine.refreshProviderStatus() } },
+                        onClick = {
+                            if (ready) {
+                                scope.launch { engine.refreshProviderStatus() }
+                            } else {
+                                // Sending the user to Settings and then not taking
+                                // them there is the same as saying nothing.
+                                onOpenMenu()
+                            }
+                        },
                         icon = {
                             Icon(
                                 Icons.Outlined.SmartToy,
@@ -436,18 +447,36 @@ fun ChatScreen(
                         } else if (engine.send(draft)) {
                             draft = ""
                         }
-                    }
+                    },
+                    onBlocked = { sendBlocked = true }
                 )
             }
 
+            // The send button cannot act right now, so say exactly why and where to
+            // fix it. The old fixed "connect a provider" line never changed, which
+            // made a config step look like the app simply not working.
+            val reason = status?.reason ?: "No provider is configured"
             Text(
                 text = when {
                     state.busy -> "Streaming from provider..."
                     ready -> "In-memory session - lost on process death"
-                    else -> "Connect a provider or local runtime to send a message."
+                    sendBlocked -> "$reason - tap here to open Providers"
+                    else -> "$reason. Tap to open Providers."
                 },
                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                color = OnDarkMuted
+                color = if (sendBlocked) Gold else OnDarkMuted,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (!ready && !state.busy) {
+                            Modifier.clickable {
+                                sendBlocked = false
+                                onOpenMenu()
+                            }
+                        } else {
+                            Modifier
+                        }
+                    )
             )
         }
     }

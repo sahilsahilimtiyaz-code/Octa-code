@@ -480,7 +480,13 @@ fun GoldSendButton(
     enabled: Boolean,
     busy: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /**
+     * Invoked when the button is tapped but cannot act. Without it the tap is
+     * swallowed outright, so the user gets no explanation for why nothing
+     * happened — which reads as the app being broken rather than unconfigured.
+     */
+    onBlocked: (() -> Unit)? = null
 ) {
     Box(
         modifier = modifier.size(48.dp),
@@ -530,7 +536,10 @@ fun GoldSendButton(
                     },
                     CircleShape
                 )
-                .clickable(enabled = enabled || busy, onClick = onClick),
+                .clickable(
+                    enabled = enabled || busy || onBlocked != null,
+                    onClick = { if (enabled || busy) onClick() else onBlocked?.invoke() }
+                ),
             contentAlignment = Alignment.Center
         ) {
             if (busy) {
