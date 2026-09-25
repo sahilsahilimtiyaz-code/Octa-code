@@ -252,6 +252,18 @@ fun ChatScreen(
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
                 )
             }
+
+            // A failed history write has to be said out loud. The chat keeps
+            // running from memory, so without this the user would only find
+            // out their conversation vanished the next time they open it.
+            state.persistenceError?.let { reason ->
+                Text(
+                    text = "Not saved · $reason",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = WarningAmber,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
+                )
+            }
         }
 
         // —— composer pinned to bottom (always visible) ————————————

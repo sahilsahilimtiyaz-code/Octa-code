@@ -8,6 +8,7 @@ import com.sahil.octacode.core.provider.ChatRequest
 import com.sahil.octacode.core.provider.ChatRole
 import com.sahil.octacode.core.provider.ProviderId
 import com.sahil.octacode.core.provider.defaultModelFor
+import com.sahil.octacode.core.profile.DefaultChain
 import com.sahil.octacode.data.providers.ProviderHttpException
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
@@ -19,6 +20,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 enum class ChatAuthor { USER, AGENT }
 
@@ -28,7 +31,14 @@ data class ChatTurn(
     val author: ChatAuthor,
     val text: String,
     val streaming: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    /**
+     * Assigned when the turn is created, not when it happens to reach disk.
+     * Persisting on coroutine scheduling order would let a late-finishing
+     * write sort a message above one the user sent after it; stamping here
+     * means stored order always equals the order that was on screen.
+     */
+    val createdAt: Long = 0L
 )
 
 /**
@@ -41,13 +51,31 @@ data class ChatEngineState(
     val streamingText: String? = null,
     val lastError: String? = null,
     val selectedProvider: ProviderId = ProviderId.OPENAI,
-    val providerStatus: ProviderStatus? = null
+    val providerStatus: ProviderStatus? = null,
+    /**
+     * Session backing the current conversation, or null when history is not
+     * being written. Null is not an error — it is the honest signal that
+     * nothing is being saved, so no screen can imply otherwise.
+     */
+    val sessionId: String? = null,
+    /**
+     * Set when a write to the store failed. Stays set until the session is
+     * opened or the conversation is cleared: a later successful write does not
+     * make the lost turn reappear, so clearing it would hide real data loss.
+     */
+    val persistenceError: String? = null,
 )
 
 class ChatEngine(
     private val registry: CapabilityRegistry,
     private val providers: Map<ProviderId, AiProvider>,
     private val modelFor: (ProviderId) -> String = ::defaultModelFor,
+    /**
+     * Null means "this instance does not persist" — the tests' setup, never
+     * production, which always receives the Room-backed implementation.
+     */
+    private val repository: ChatRepository? = null,
+    private val clock: () -> Long = { System.currentTimeMillis() },
     scope: CoroutineScope? = null
 ) {
     private val _state = MutableStateFlow(ChatEngineState())
@@ -55,6 +83,25 @@ class ChatEngine(
 
     private val scope: CoroutineScope = scope ?: CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var streamJob: Job? = null
+
+    /** Serialises writes so turns cannot land out of order. */
+    private val writeMutex = Mutex()
+
+    /** Guarantees strictly increasing stamps, so ordering survives timestamp ties. */
+    private var lastStamp = 0L
+
+    /**
+     * Wall clock, floored to be strictly increasing. Two turns written in the
+     * same millisecond must not compare equal, or their relative order would be
+     * decided by a UUID — effectively at random.
+     */
+    @Synchronized
+    private fun nextStamp(): Long {
+        val now = clock()
+        val stamp = if (now > lastStamp) now else lastStamp + 1
+        lastStamp = stamp
+        return stamp
+    }
 
     suspend fun refreshProviderStatus() {
         val id = _state.value.selectedProvider
@@ -79,7 +126,18 @@ class ChatEngine(
 
     fun clearConversation() {
         if (_state.value.busy) return
-        _state.value = ChatEngineState(selectedProvider = _state.value.selectedProvider)
+        // Detaching the session is what makes the next send open a fresh one.
+        // The conversation just left stays on disk — "clear" must not mean
+        // "destroy the history you can see in Recent Chats".
+        //
+        // The probe is carried over deliberately: clearing text says nothing
+        // about the API key, and dropping it here meant the very next send was
+        // refused with "Provider not probed yet" for no reason the user could
+        // see.
+        _state.value = ChatEngineState(
+            selectedProvider = _state.value.selectedProvider,
+            providerStatus = _state.value.providerStatus,
+        )
     }
 
     /**
@@ -90,7 +148,12 @@ class ChatEngine(
         val text = userText.trim()
         if (text.isEmpty() || _state.value.busy) return false
 
-        val userTurn = ChatTurn(id = UUID.randomUUID().toString(), author = ChatAuthor.USER, text = text)
+        val userTurn = ChatTurn(
+            id = UUID.randomUUID().toString(),
+            author = ChatAuthor.USER,
+            text = text,
+            createdAt = nextStamp(),
+        )
         val providerId = _state.value.selectedProvider
         // Prefer cached probe; if never probed, refuse honestly until refreshProviderStatus runs.
         val status = _state.value.providerStatus
@@ -104,6 +167,7 @@ class ChatEngine(
                     turns = it.turns + userTurn
                 )
             }
+            persistAsync(userTurn)
             return false
         }
 
@@ -115,6 +179,7 @@ class ChatEngine(
                     turns = it.turns + userTurn
                 )
             }
+            persistAsync(userTurn)
             return false
         }
 
@@ -125,14 +190,19 @@ class ChatEngine(
         }
         val request = ChatRequest(messages = history, model = modelFor(providerId))
 
+        // Hoisted out of the update lambda: MutableStateFlow.update may retry
+        // that lambda, and stamping inside it would burn a stamp per attempt.
+        val assistantTurn = ChatTurn(
+            id = assistantId,
+            author = ChatAuthor.AGENT,
+            text = "",
+            streaming = true,
+            createdAt = nextStamp(),
+        )
+
         _state.update {
             it.copy(
-                turns = it.turns + userTurn + ChatTurn(
-                    id = assistantId,
-                    author = ChatAuthor.AGENT,
-                    text = "",
-                    streaming = true
-                ),
+                turns = it.turns + userTurn + assistantTurn,
                 busy = true,
                 streamingText = "",
                 lastError = null,
@@ -143,6 +213,9 @@ class ChatEngine(
         streamJob = scope.launch {
             val buffer = StringBuilder()
             try {
+                // Persisted before the stream so the user's message cannot be
+                // lost to a network failure that arrives first.
+                persist(userTurn)
                 provider.chatStream(request).collect { chunk ->
                     if (chunk.delta.isNotEmpty()) {
                         buffer.append(chunk.delta)
@@ -186,7 +259,7 @@ class ChatEngine(
         return true
     }
 
-    private fun finalize(assistantId: String, text: String, error: String?, stopped: Boolean) {
+    private suspend fun finalize(assistantId: String, text: String, error: String?, stopped: Boolean) {
         _state.update { s ->
             s.copy(
                 busy = false,
@@ -212,6 +285,110 @@ class ChatEngine(
                 }
             )
         }
+
+        // Store what the reader will actually see — the stopped/failed label,
+        // not the raw arguments — so a reopened chat renders identically.
+        _state.value.turns.firstOrNull { it.id == assistantId }?.let { persist(it) }
+    }
+
+    // --- persistence ----------------------------------------------------------
+
+    /** Non-suspend entry point for call sites inside `send`. */
+    private fun persistAsync(turn: ChatTurn) {
+        if (repository == null) return
+        scope.launch { persist(turn) }
+    }
+
+    private suspend fun persist(turn: ChatTurn) {
+        val repo = repository ?: return
+        writeMutex.withLock {
+            try {
+                val sessionId = _state.value.sessionId ?: createSessionLocked(repo, turn)
+                repo.append(
+                    StoredTurn(
+                        id = turn.id,
+                        sessionId = sessionId,
+                        author = turn.author,
+                        text = turn.text,
+                        error = turn.error,
+                        createdAt = turn.createdAt.takeIf { it > 0 } ?: nextStamp(),
+                    )
+                )
+            } catch (c: CancellationException) {
+                throw c
+            } catch (t: Throwable) {
+                // A failed write must be visible, not swallowed: the chat keeps
+                // working from memory, but this turn will not be there after a
+                // restart and the user has to be told rather than discover it.
+                _state.update { s ->
+                    s.copy(persistenceError = t.message ?: t::class.java.simpleName)
+                }
+            }
+        }
+    }
+
+    private suspend fun createSessionLocked(repo: ChatRepository, hint: ChatTurn): String {
+        _state.value.sessionId?.let { return it }
+        val created = repo.createSession(
+            profile = DefaultChain.of(modelFor(_state.value.selectedProvider)),
+            title = titleFor(hint),
+            now = hint.createdAt.takeIf { it > 0 } ?: nextStamp(),
+        )
+        _state.update { it.copy(sessionId = created.id) }
+        return created.id
+    }
+
+    private fun titleFor(hint: ChatTurn): String {
+        val source = if (hint.author == ChatAuthor.USER) {
+            hint.text
+        } else {
+            _state.value.turns.firstOrNull { it.author == ChatAuthor.USER }?.text.orEmpty()
+        }
+        val oneLine = source.replace(WHITESPACE_RUN, " ").trim()
+        return oneLine.take(TITLE_MAX_LENGTH).ifEmpty { NEW_CHAT_TITLE }
+    }
+
+    /**
+     * Reopen a stored conversation, replacing what is on screen.
+     *
+     * Refuses while a stream is in flight: swapping history under an active
+     * stream would interleave two conversations in both the view and the store.
+     *
+     * The provider selection is deliberately left alone. A session records a
+     * model id, not an adapter, and model → adapter is not reliably invertible
+     * (several adapters can serve one id), so guessing would silently move the
+     * conversation to a different endpoint than it ran on.
+     */
+    suspend fun openSession(sessionId: String): Boolean {
+        val repo = repository ?: return false
+        if (_state.value.busy) return false
+        return writeMutex.withLock {
+            val session = repo.session(sessionId)
+            if (session == null) {
+                _state.update { it.copy(lastError = "That conversation is no longer available") }
+                return@withLock false
+            }
+            val restored = repo.turns(sessionId).map { stored ->
+                ChatTurn(
+                    id = stored.id,
+                    author = stored.author,
+                    text = stored.text,
+                    streaming = false,
+                    error = stored.error,
+                    createdAt = stored.createdAt,
+                )
+            }
+            _state.update {
+                it.copy(
+                    turns = restored,
+                    sessionId = sessionId,
+                    lastError = null,
+                    streamingText = null,
+                    persistenceError = null,
+                )
+            }
+            true
+        }
     }
 
     fun shutdown() {
@@ -220,4 +397,10 @@ class ChatEngine(
     }
 
     private object StopRequest : CancellationException("stop")
+
+    private companion object {
+        const val TITLE_MAX_LENGTH = 60
+        const val NEW_CHAT_TITLE = "New chat"
+        val WHITESPACE_RUN = Regex("\\s+")
+    }
 }
