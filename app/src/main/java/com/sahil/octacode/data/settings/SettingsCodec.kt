@@ -28,6 +28,8 @@ internal object SettingsCodec {
     const val KEY_ARCHIVE_AFTER_DAYS = "archive_after_days"
     const val KEY_LIMIT_ACTIVE_CHATS = "limit_active_chats"
     const val KEY_MAX_ACTIVE_CHATS = "max_active_chats"
+    const val KEY_SERVER_ENABLED = "server_enabled"
+    const val KEY_SERVER_PORT = "server_port"
 
     fun encode(settings: Settings): Map<String, Any?> {
         val s = settings.sanitized()
@@ -43,6 +45,8 @@ internal object SettingsCodec {
             KEY_ARCHIVE_AFTER_DAYS to s.archiveAfterDays,
             KEY_LIMIT_ACTIVE_CHATS to s.limitActiveChats,
             KEY_MAX_ACTIVE_CHATS to s.maxActiveChats,
+            KEY_SERVER_ENABLED to s.serverEnabled,
+            KEY_SERVER_PORT to s.serverPort,
         )
     }
 
@@ -60,6 +64,8 @@ internal object SettingsCodec {
             archiveAfterDays = raw.intOr(KEY_ARCHIVE_AFTER_DAYS, base.archiveAfterDays),
             limitActiveChats = raw.boolOr(KEY_LIMIT_ACTIVE_CHATS, base.limitActiveChats),
             maxActiveChats = raw.intOr(KEY_MAX_ACTIVE_CHATS, base.maxActiveChats),
+            serverEnabled = raw.boolOr(KEY_SERVER_ENABLED, base.serverEnabled),
+            serverPort = raw.intOr(KEY_SERVER_PORT, base.serverPort),
         ).sanitized()
     }
 

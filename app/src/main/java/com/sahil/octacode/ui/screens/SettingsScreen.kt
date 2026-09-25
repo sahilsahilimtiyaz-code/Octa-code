@@ -34,6 +34,7 @@ fun SettingsScreen(
     onOpenChat: () -> Unit = {},
     onOpenProviders: () -> Unit = {},
     onOpenAutonomy: () -> Unit = {},
+    onOpenServer: () -> Unit = {},
     onOpenRuntime: () -> Unit = {},
 ) {
     Column(
@@ -69,6 +70,11 @@ fun SettingsScreen(
             title = "Autonomy",
             subtitle = "How much the agent may do unattended",
             onClick = onOpenAutonomy,
+        )
+        SettingsNavRow(
+            title = "Server",
+            subtitle = "Local server port and availability",
+            onClick = onOpenServer,
         )
         SettingsNavRow(
             title = "Runtime",

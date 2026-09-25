@@ -53,6 +53,17 @@ data class Settings(
     val archiveAfterDays: Int = 30,
     val limitActiveChats: Boolean = false,
     val maxActiveChats: Int = 20,
+    /**
+     * The local server this build does not run yet.
+     *
+     * Stored now because it is a real value with a real future reader, and
+     * because a port the user picked should not be forgotten by the release
+     * that arrives before the server does. The control is shown locked until
+     * there is a process to bind it to — a switch over a service that does not
+     * exist would be a setting that writes and never acts.
+     */
+    val serverEnabled: Boolean = false,
+    val serverPort: Int = DEFAULT_SERVER_PORT,
 ) {
 
     /**
@@ -66,6 +77,7 @@ data class Settings(
         archiveAfterDays = archiveAfterDays.takeIf { it in ARCHIVE_CHOICES }
             ?: DEFAULT_ARCHIVE_DAYS,
         maxActiveChats = maxActiveChats.coerceIn(MIN_ACTIVE_CHATS, MAX_ACTIVE_CHATS),
+        serverPort = serverPort.coerceIn(MIN_SERVER_PORT, MAX_SERVER_PORT),
     )
 
     private fun Float.clampedFontScale(): Float =
@@ -81,5 +93,11 @@ data class Settings(
 
         const val MIN_ACTIVE_CHATS = 1
         const val MAX_ACTIVE_CHATS = 200
+
+        const val DEFAULT_SERVER_PORT = 8080
+
+        /** Ports below 1024 need privileges this app does not have. */
+        const val MIN_SERVER_PORT = 1024
+        const val MAX_SERVER_PORT = 65535
     }
 }

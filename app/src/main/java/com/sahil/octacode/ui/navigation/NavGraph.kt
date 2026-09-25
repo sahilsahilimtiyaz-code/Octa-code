@@ -17,6 +17,7 @@ import com.sahil.octacode.ui.screens.SettingsAutonomyScreen
 import com.sahil.octacode.ui.screens.SettingsChatScreen
 import com.sahil.octacode.ui.screens.SettingsProvidersScreen
 import com.sahil.octacode.ui.screens.SettingsScreen
+import com.sahil.octacode.ui.screens.SettingsServerScreen
 import com.sahil.octacode.ui.screens.SettingsSessionsScreen
 import com.sahil.octacode.ui.screens.SplashScreen
 import com.sahil.octacode.ui.screens.TerminalScreen
@@ -54,6 +55,7 @@ fun OctaNavGraph(navController: NavHostController) {
                 onOpenChat = { navController.navigate(Routes.SETTINGS_CHAT) },
                 onOpenProviders = { navController.navigate(Routes.SETTINGS_PROVIDERS) },
                 onOpenAutonomy = { navController.navigate(Routes.SETTINGS_AUTONOMY) },
+                onOpenServer = { navController.navigate(Routes.SETTINGS_SERVER) },
                 onOpenRuntime = { navController.navigate(Routes.RUNTIME) },
             )
         }
@@ -71,6 +73,9 @@ fun OctaNavGraph(navController: NavHostController) {
         }
         composable(Routes.SETTINGS_AUTONOMY) {
             SettingsAutonomyScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Routes.SETTINGS_SERVER) {
+            SettingsServerScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.RUNTIME) {
             RuntimeScreen(onBack = { navController.popBackStack() })

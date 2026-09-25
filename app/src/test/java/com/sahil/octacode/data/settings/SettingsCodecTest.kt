@@ -30,6 +30,8 @@ class SettingsCodecTest {
             archiveAfterDays = 60,
             limitActiveChats = true,
             maxActiveChats = 7,
+            serverEnabled = true,
+            serverPort = 9090,
         )
 
         assertEquals(original, SettingsCodec.decode(SettingsCodec.encode(original)))
@@ -61,6 +63,11 @@ class SettingsCodecTest {
         assertEquals(ThemeMode.AUTO, SettingsCodec.decode(emptyMap<String, Any?>()).theme)
         assertEquals(30, SettingsCodec.decode(emptyMap<String, Any?>()).archiveAfterDays)
         assertEquals(20, SettingsCodec.decode(emptyMap<String, Any?>()).maxActiveChats)
+        assertEquals(false, SettingsCodec.decode(emptyMap<String, Any?>()).serverEnabled)
+        assertEquals(
+            Settings.DEFAULT_SERVER_PORT,
+            SettingsCodec.decode(emptyMap<String, Any?>()).serverPort
+        )
     }
 
     @Test
@@ -70,12 +77,14 @@ class SettingsCodecTest {
             SettingsCodec.KEY_UI_FONT_SCALE to "big",
             SettingsCodec.KEY_AUTO_ARCHIVE to "yes",
             SettingsCodec.KEY_ARCHIVE_AFTER_DAYS to true,
+            SettingsCodec.KEY_SERVER_PORT to true,
         )
         val decoded = SettingsCodec.decode(raw)
         assertEquals(ThemeMode.AUTO, decoded.theme)
         assertEquals(1.0f, decoded.uiFontScale, 0f)
         assertEquals(false, decoded.autoArchive)
         assertEquals(Settings.DEFAULT_ARCHIVE_DAYS, decoded.archiveAfterDays)
+        assertEquals(Settings.DEFAULT_SERVER_PORT, decoded.serverPort)
     }
 
     @Test
@@ -127,10 +136,39 @@ class SettingsCodecTest {
     }
 
     @Test
+    fun `a port this app could never bind is clamped`() {
+        // Below 1024 needs privileges the app does not have, above 65535 does
+        // not exist. Storing either would be a configured port that is refused
+        // at bind time with no explanation of why it was ever accepted.
+        assertEquals(
+            Settings.MIN_SERVER_PORT,
+            SettingsCodec.decode(
+                mapOf<String, Any?>(SettingsCodec.KEY_SERVER_PORT to 80)
+            ).serverPort
+        )
+        assertEquals(
+            Settings.MAX_SERVER_PORT,
+            SettingsCodec.decode(
+                mapOf<String, Any?>(SettingsCodec.KEY_SERVER_PORT to 1_000_000)
+            ).serverPort
+        )
+        // A valid port is left exactly as written.
+        assertEquals(
+            9090,
+            SettingsCodec.decode(
+                mapOf<String, Any?>(SettingsCodec.KEY_SERVER_PORT to 9090)
+            ).serverPort
+        )
+    }
+
+    @Test
     fun `encode sanitizes so the disk never holds an illegal value`() {
-        val encoded = SettingsCodec.encode(Settings(uiFontScale = 99f, archiveAfterDays = 1))
+        val encoded = SettingsCodec.encode(
+            Settings(uiFontScale = 99f, archiveAfterDays = 1, serverPort = 12)
+        )
         assertEquals(Settings.MAX_FONT_SCALE, encoded[SettingsCodec.KEY_UI_FONT_SCALE])
         assertEquals(Settings.DEFAULT_ARCHIVE_DAYS, encoded[SettingsCodec.KEY_ARCHIVE_AFTER_DAYS])
+        assertEquals(Settings.MIN_SERVER_PORT, encoded[SettingsCodec.KEY_SERVER_PORT])
     }
 
     @Test
