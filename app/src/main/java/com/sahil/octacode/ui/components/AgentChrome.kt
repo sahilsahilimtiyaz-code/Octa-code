@@ -41,11 +41,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sahil.octacode.ui.motion.LocalMotionPolicy
-import com.sahil.octacode.ui.theme.Gold
-import com.sahil.octacode.ui.theme.GoldBright
-import com.sahil.octacode.ui.theme.GoldDeep
-import com.sahil.octacode.ui.theme.GoldText
+import com.sahil.octacode.ui.theme.BubblePink
+import com.sahil.octacode.ui.theme.ElectricPurple
 import com.sahil.octacode.ui.theme.NeonBlue
+import com.sahil.octacode.ui.theme.NeonBlueBright
 import com.sahil.octacode.ui.theme.NeonGreen
 import com.sahil.octacode.ui.theme.OnDark
 import com.sahil.octacode.ui.theme.OnDarkMuted
@@ -128,7 +127,7 @@ fun AgentTopBar(
     }
 }
 
-/** Hexagonal brand mark (gold/cyan) used in the Agent header. */
+/** Hexagonal brand mark (cyan/violet) used in the Agent header. */
 @Composable
 fun HexLogo(modifier: Modifier = Modifier) {
     Canvas(modifier = modifier) {
@@ -149,7 +148,7 @@ fun HexLogo(modifier: Modifier = Modifier) {
         drawPath(
             path = hexPath(1f),
             brush = Brush.linearGradient(
-                colors = listOf(GoldBright, Gold, NeonBlue),
+                colors = listOf(NeonBlueBright, NeonBlue, ElectricPurple),
                 start = Offset(0f, 0f),
                 end = Offset(w, h)
             ),
@@ -159,7 +158,7 @@ fun HexLogo(modifier: Modifier = Modifier) {
         drawPath(inner, color = Color.Black.copy(alpha = 0.7f))
         drawPath(
             path = inner,
-            brush = Brush.linearGradient(listOf(Gold, NeonBlue)),
+            brush = Brush.linearGradient(listOf(NeonBlue, ElectricPurple)),
             style = Stroke(width = w * 0.045f)
         )
     }
@@ -183,7 +182,7 @@ fun AgentStatusPill(
                 1.dp,
                 Brush.horizontalGradient(
                     listOf(
-                        Gold.copy(alpha = 0.55f),
+                        BubblePink.copy(alpha = 0.55f),
                         Color.White.copy(alpha = 0.10f),
                         NeonBlue.copy(alpha = 0.28f)
                     )
@@ -201,7 +200,7 @@ fun AgentStatusPill(
             Icon(
                 Icons.Outlined.Folder,
                 contentDescription = null,
-                tint = Gold,
+                tint = NeonBlue,
                 modifier = Modifier.size(26.dp)
             )
             Spacer(Modifier.width(12.dp))
@@ -258,7 +257,7 @@ fun HeroPlanet(modifier: Modifier = Modifier) {
 
         drawCircle(
             brush = Brush.radialGradient(
-                colors = listOf(Gold.copy(alpha = 0.20f), NeonBlue.copy(alpha = 0.08f), Color.Transparent),
+                colors = listOf(BubblePink.copy(alpha = 0.20f), ElectricPurple.copy(alpha = 0.10f), Color.Transparent),
                 center = Offset(cx, cy),
                 radius = r * 2.5f
             ),
@@ -276,7 +275,7 @@ fun HeroPlanet(modifier: Modifier = Modifier) {
         )
         drawCircle(
             brush = Brush.radialGradient(
-                colors = listOf(GoldBright.copy(alpha = 0.70f), Gold.copy(alpha = 0.18f), Color.Transparent),
+                colors = listOf(NeonBlueBright.copy(alpha = 0.70f), NeonBlue.copy(alpha = 0.18f), Color.Transparent),
                 center = Offset(cx - r * 0.38f, cy - r * 0.42f),
                 radius = r * 1.0f
             ),
@@ -286,7 +285,7 @@ fun HeroPlanet(modifier: Modifier = Modifier) {
         val ringStroke = 2.5.dp.toPx()
         drawOval(
             brush = Brush.horizontalGradient(
-                colors = listOf(Color.Transparent, Gold.copy(alpha = 0.9f), NeonBlue.copy(alpha = 0.55f), Color.Transparent)
+                colors = listOf(Color.Transparent, BubblePink.copy(alpha = 0.9f), NeonBlue.copy(alpha = 0.55f), Color.Transparent)
             ),
             topLeft = Offset(cx - r * 1.85f, cy - r * 0.62f),
             size = androidx.compose.ui.geometry.Size(r * 3.7f, r * 1.25f),
@@ -294,7 +293,7 @@ fun HeroPlanet(modifier: Modifier = Modifier) {
         )
         drawOval(
             brush = Brush.horizontalGradient(
-                colors = listOf(Color.Transparent, NeonBlue.copy(alpha = 0.75f), Gold.copy(alpha = 0.45f), Color.Transparent)
+                colors = listOf(Color.Transparent, NeonBlue.copy(alpha = 0.75f), ElectricPurple.copy(alpha = 0.45f), Color.Transparent)
             ),
             topLeft = Offset(cx - r * 1.55f, cy - r * 0.18f),
             size = androidx.compose.ui.geometry.Size(r * 3.1f, r * 0.90f),
@@ -302,7 +301,7 @@ fun HeroPlanet(modifier: Modifier = Modifier) {
         )
         if (!motion.reducedMotion) {
             drawArc(
-                color = GoldBright.copy(alpha = 0.40f),
+                color = NeonBlueBright.copy(alpha = 0.40f),
                 startAngle = -50f,
                 sweepAngle = 75f,
                 useCenter = false,
@@ -314,7 +313,7 @@ fun HeroPlanet(modifier: Modifier = Modifier) {
     }
 }
 
-/** Gold or cyan bordered info card from the reference empty state. */
+/** Cyan or violet bordered info card from the reference empty state. */
 @Composable
 fun AccentInfoCard(
     title: String,
@@ -425,7 +424,7 @@ fun AgentHeroCopy(modifier: Modifier = Modifier) {
                 lineHeight = 46.sp,
                 letterSpacing = (-0.5).sp
             ),
-            color = GoldText
+            color = NeonBlueBright
         )
         Spacer(Modifier.height(10.dp))
         Text(
@@ -474,9 +473,9 @@ fun ComposerPill(
     }
 }
 
-/** Circular gold send / stop control with glow ring (reference). */
+/** Circular neon send / stop control with a gradient glow ring. */
 @Composable
-fun GoldSendButton(
+fun NeonSendButton(
     enabled: Boolean,
     busy: Boolean,
     onClick: () -> Unit,
@@ -500,8 +499,8 @@ fun GoldSendButton(
                 .background(
                     Brush.radialGradient(
                         colors = listOf(
-                            Gold.copy(alpha = if (enabled || busy) 0.45f else 0.22f),
-                            Gold.copy(alpha = 0.10f),
+                            NeonBlue.copy(alpha = if (enabled || busy) 0.45f else 0.22f),
+                            NeonBlue.copy(alpha = 0.10f),
                             Color.Transparent
                         )
                     )
@@ -514,7 +513,7 @@ fun GoldSendButton(
                 .background(
                     if (enabled || busy) {
                         Brush.radialGradient(
-                            colors = listOf(GoldBright.copy(alpha = 0.35f), Color(0xFF1A1408), Color(0xFF0C0A06))
+                            colors = listOf(NeonBlueBright.copy(alpha = 0.35f), Color(0xFF0B1A2E), Color(0xFF0A0A16))
                         )
                     } else {
                         Brush.radialGradient(
@@ -525,12 +524,12 @@ fun GoldSendButton(
                 .border(
                     1.8.dp,
                     if (enabled || busy) {
-                        Brush.linearGradient(listOf(GoldBright, Gold, GoldDeep))
+                        Brush.linearGradient(listOf(NeonBlueBright, NeonBlue, ElectricPurple))
                     } else {
                         Brush.linearGradient(
                             listOf(
-                                Gold.copy(alpha = 0.55f),
-                                Gold.copy(alpha = 0.30f)
+                                NeonBlue.copy(alpha = 0.55f),
+                                ElectricPurple.copy(alpha = 0.35f)
                             )
                         )
                     },
@@ -546,13 +545,13 @@ fun GoldSendButton(
                 Box(
                     modifier = Modifier
                         .size(14.dp)
-                        .background(GoldBright, RoundedCornerShape(2.dp))
+                        .background(NeonBlueBright, RoundedCornerShape(2.dp))
                 )
             } else {
                 Icon(
                     imageVector = Icons.Filled.Send,
                     contentDescription = "Send",
-                    tint = if (enabled) GoldBright else OnDarkMuted.copy(alpha = 0.7f),
+                    tint = if (enabled) NeonBlueBright else OnDarkMuted.copy(alpha = 0.7f),
                     modifier = Modifier.size(22.dp)
                 )
             }

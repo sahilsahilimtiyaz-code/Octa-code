@@ -46,8 +46,9 @@ import com.sahil.octacode.ui.motion.LocalMotionPolicy
 import com.sahil.octacode.ui.motion.rememberSystemMotionPolicy
 import com.sahil.octacode.ui.navigation.OctaNavGraph
 import com.sahil.octacode.ui.navigation.Routes
-import com.sahil.octacode.ui.theme.Gold
-import com.sahil.octacode.ui.theme.GoldBright
+import com.sahil.octacode.ui.theme.ElectricPurple
+import com.sahil.octacode.ui.theme.NeonBlue
+import com.sahil.octacode.ui.theme.NeonBlueBright
 import com.sahil.octacode.ui.theme.OctaCodeTheme
 import com.sahil.octacode.ui.theme.OnDark
 import com.sahil.octacode.ui.theme.OnDarkMuted
@@ -154,15 +155,15 @@ private fun AgentBottomBar(
                                     .background(
                                         Brush.horizontalGradient(
                                             listOf(
-                                                Gold.copy(alpha = 0.18f),
-                                                GoldBright.copy(alpha = 0.10f)
+                                                NeonBlue.copy(alpha = 0.18f),
+                                                NeonBlueBright.copy(alpha = 0.10f)
                                             )
                                         )
                                     )
                                     .border(
                                         1.5.dp,
                                         Brush.horizontalGradient(
-                                            listOf(GoldBright, Gold.copy(alpha = 0.70f))
+                                            listOf(NeonBlueBright, ElectricPurple)
                                         ),
                                         RoundedCornerShape(16.dp)
                                     )
@@ -176,7 +177,7 @@ private fun AgentBottomBar(
                     Icon(
                         imageVector = dest.icon,
                         contentDescription = dest.label,
-                        tint = if (selected) GoldBright else OnDarkMuted,
+                        tint = if (selected) NeonBlueBright else OnDarkMuted,
                         modifier = Modifier.size(26.dp)
                     )
                 }
@@ -196,7 +197,7 @@ private fun AgentBottomBar(
                         .height(if (selected) 2.5.dp else 0.dp)
                         .background(
                             if (selected) Brush.horizontalGradient(
-                                listOf(Gold.copy(alpha = 0.2f), GoldBright, Gold.copy(alpha = 0.2f))
+                                listOf(NeonBlue.copy(alpha = 0.2f), NeonBlueBright, NeonBlue.copy(alpha = 0.2f))
                             ) else Brush.horizontalGradient(listOf(Color.Transparent, Color.Transparent)),
                             RoundedCornerShape(2.dp)
                         )

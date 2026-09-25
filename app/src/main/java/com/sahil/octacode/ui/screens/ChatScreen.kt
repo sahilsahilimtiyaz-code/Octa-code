@@ -61,12 +61,12 @@ import com.sahil.octacode.ui.components.AgentStatusPill
 import com.sahil.octacode.ui.components.AgentTopBar
 import com.sahil.octacode.ui.components.ChatBubble
 import com.sahil.octacode.ui.components.ComposerPill
-import com.sahil.octacode.ui.components.GoldSendButton
+import com.sahil.octacode.ui.components.NeonSendButton
 import com.sahil.octacode.ui.components.HeroPlanet
 import com.sahil.octacode.ui.components.ThinkingOrb
-import com.sahil.octacode.ui.theme.Gold
-import com.sahil.octacode.ui.theme.GoldBright
+import com.sahil.octacode.ui.theme.ElectricPurple
 import com.sahil.octacode.ui.theme.NeonBlue
+import com.sahil.octacode.ui.theme.NeonBlueBright
 import com.sahil.octacode.ui.theme.OnDark
 import com.sahil.octacode.ui.theme.OnDarkMuted
 import com.sahil.octacode.ui.theme.WarningAmber
@@ -188,7 +188,7 @@ fun ChatScreen(
                         } else {
                             "No provider or local agent runtime is connected. Configure Model & Provider from the menu before starting a session."
                         },
-                        accent = Gold,
+                        accent = ElectricPurple,
                         onClick = {
                             if (ready) {
                                 scope.launch { engine.refreshProviderStatus() }
@@ -202,7 +202,7 @@ fun ChatScreen(
                             Icon(
                                 Icons.Outlined.SmartToy,
                                 contentDescription = null,
-                                tint = Gold,
+                                tint = ElectricPurple,
                                 modifier = Modifier.size(28.dp)
                             )
                         }
@@ -272,10 +272,10 @@ fun ChatScreen(
                     1.5.dp,
                     Brush.horizontalGradient(
                         listOf(
-                            Gold.copy(alpha = 0.90f),
-                            Gold.copy(alpha = 0.35f),
-                            NeonBlue.copy(alpha = 0.55f),
-                            NeonBlue.copy(alpha = 0.85f)
+                            NeonBlue.copy(alpha = 0.90f),
+                            NeonBlue.copy(alpha = 0.35f),
+                            ElectricPurple.copy(alpha = 0.55f),
+                            ElectricPurple.copy(alpha = 0.95f)
                         )
                     ),
                     RoundedCornerShape(20.dp)
@@ -356,8 +356,22 @@ fun ChatScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(28.dp))
-                    .background(Color.White.copy(alpha = 0.035f))
-                    .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(28.dp))
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(Color.White.copy(alpha = 0.035f), NeonBlue.copy(alpha = 0.05f))
+                        )
+                    )
+                    .border(
+                        1.dp,
+                        Brush.horizontalGradient(
+                            listOf(
+                                NeonBlue.copy(alpha = 0.50f),
+                                Color.White.copy(alpha = 0.14f),
+                                ElectricPurple.copy(alpha = 0.45f)
+                            )
+                        ),
+                        RoundedCornerShape(28.dp)
+                    )
                     .padding(start = 4.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -422,7 +436,7 @@ fun ChatScreen(
                         color = OnDark,
                         fontSize = 15.sp
                     ),
-                    cursorBrush = Brush.linearGradient(listOf(Gold, GoldBright)),
+                    cursorBrush = Brush.linearGradient(listOf(NeonBlue, NeonBlueBright)),
                     singleLine = true,
                     decorationBox = { innerTextField ->
                         Box(contentAlignment = Alignment.CenterStart) {
@@ -438,7 +452,7 @@ fun ChatScreen(
                     }
                 )
                 Spacer(Modifier.width(4.dp))
-                GoldSendButton(
+                NeonSendButton(
                     enabled = draft.isNotBlank() && ready && !state.busy,
                     busy = state.busy,
                     onClick = {
@@ -464,7 +478,7 @@ fun ChatScreen(
                     else -> "$reason. Tap to open Providers."
                 },
                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                color = if (sendBlocked) Gold else OnDarkMuted,
+                color = if (sendBlocked) NeonBlue else OnDarkMuted,
                 modifier = Modifier
                     .fillMaxWidth()
                     .then(

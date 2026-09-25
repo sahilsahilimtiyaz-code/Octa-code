@@ -184,6 +184,34 @@ Native Android AI coding workstation. No legacy, no stubs wired as real.
   header checksum, non-deb input — plus installer install/uninstall/shared-path and index
   lookup suites. **148 tests, all passing** (`:app:testDebugUnitTest`).
 
+### M4.4 Provider diagnostics + neon theme pass
+
+Two reported failures were the app withholding information it already had; a
+third was a form that forgot its own contents.
+
+- **Errors carry the server's reason.** `openAiCompatibleStream` threw with only
+  the status line. Providers explain themselves in the response body, so
+  `HTTP 401` was discarding the sentence that named the wrong key. Errors now
+  extract `error.message`, unescape JSON, collapse to one line, and never pass
+  HTML off as an explanation.
+- **Cross-provider keys caught at validation.** `sk-or-…` passes a
+  `startsWith("sk-")` check, so an OpenRouter key cleared OpenAI's validation and
+  only failed once the request reached `api.openai.com`. Now named *before* the
+  request leaves.
+- **`"model": "default"` never reaches the wire.** That string is our own
+  placeholder for "unset"; every real server answers 400 to it.
+  `resolveCustomModel` returns null and the adapter refuses with an instruction.
+- **Settings prefill from storage**; url and model survive saving, and a stored
+  key shows its prefix so a wrong paste is visible at a glance.
+
+Visually, gold was retired app-wide — `GoldSendButton` → `NeonSendButton`, the
+four `Gold*` tokens deleted with no consumers left — and the chat bubbles were
+rebuilt: the agent gets a gradient avatar + glass card, the user a gradient
+outline. Composer pill regraded to a neon border.
+
+- Unit tests: error extraction, JSON unescaping, foreign-prefix rules, model
+  resolution. **157 tests, all passing**.
+
 ## Setup
 1. Copy this folder into your projects directory.
 2. Open as existing Gradle project (AGP 8.5.2 + Kotlin 1.9.24).
