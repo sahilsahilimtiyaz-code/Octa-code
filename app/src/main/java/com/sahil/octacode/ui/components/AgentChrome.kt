@@ -49,11 +49,18 @@ import com.sahil.octacode.ui.theme.NeonGreen
 import com.sahil.octacode.ui.theme.OnDark
 import com.sahil.octacode.ui.theme.OnDarkMuted
 
-/** Circular glass icon button used in the Agent header. */
+/**
+ * Circular glass icon button used in the Agent header.
+ *
+ * The accessible label belongs on the [Icon] inside, not on this wrapper.
+ * A `contentDescription` parameter here used to be accepted and then never
+ * applied — the icons all passed `null` — so a screen reader reached an
+ * unlabelled button while the source still looked labelled. Stated once, on
+ * the node that owns the text, it is merged into the clickable and spoken.
+ */
 @Composable
 fun GlassIconButton(
     onClick: () -> Unit,
-    contentDescription: String?,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
@@ -85,8 +92,8 @@ fun AgentTopBar(
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            GlassIconButton(onClick = onMenu, contentDescription = "Menu") {
-                Icon(Icons.Outlined.Menu, contentDescription = null, tint = OnDark, modifier = Modifier.size(24.dp))
+            GlassIconButton(onClick = onMenu) {
+                Icon(Icons.Outlined.Menu, contentDescription = "Menu", tint = OnDark, modifier = Modifier.size(24.dp))
             }
             Spacer(Modifier.width(14.dp))
             HexLogo(modifier = Modifier.size(50.dp))
@@ -114,14 +121,14 @@ fun AgentTopBar(
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            GlassIconButton(onClick = onSearch, contentDescription = "Search") {
-                Icon(Icons.Filled.Search, contentDescription = null, tint = OnDark, modifier = Modifier.size(22.dp))
+            GlassIconButton(onClick = onSearch) {
+                Icon(Icons.Filled.Search, contentDescription = "Search", tint = OnDark, modifier = Modifier.size(22.dp))
             }
-            GlassIconButton(onClick = onNotifications, contentDescription = "Notifications") {
-                Icon(Icons.Filled.Notifications, contentDescription = null, tint = OnDark, modifier = Modifier.size(22.dp))
+            GlassIconButton(onClick = onNotifications) {
+                Icon(Icons.Filled.Notifications, contentDescription = "Notifications", tint = OnDark, modifier = Modifier.size(22.dp))
             }
-            GlassIconButton(onClick = onProfile, contentDescription = "Profile") {
-                Icon(Icons.Filled.Person, contentDescription = null, tint = OnDark, modifier = Modifier.size(22.dp))
+            GlassIconButton(onClick = onProfile) {
+                Icon(Icons.Filled.Person, contentDescription = "Profile", tint = OnDark, modifier = Modifier.size(22.dp))
             }
         }
     }
@@ -230,7 +237,11 @@ fun AgentStatusPill(
                 modifier = Modifier
                     .size(8.dp)
                     .clip(CircleShape)
-                    .background(NeonGreen)
+                    // Green means ready and only ready. The label directly
+                    // beside this reads "Agent unavailable" when the provider
+                    // is down, so a dot that stayed green would contradict the
+                    // words it shares a row with.
+                    .background(if (agentReady) NeonGreen else OnDarkMuted)
             )
             Spacer(Modifier.width(8.dp))
             Text(
