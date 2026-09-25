@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChevronRight
-import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -63,61 +62,6 @@ fun SettingsNavRow(
                 imageVector = Icons.Outlined.ChevronRight,
                 contentDescription = null,
                 tint = OnDarkMuted,
-            )
-        }
-    }
-}
-
-/**
- * A setting that exists and persists, but whose control is not available yet.
- *
- * This has no click handler and is not a button: it cannot be operated, and it
- * says why in plain words. The alternative — a switch that writes a value
- * nothing reads — is exactly the decorative affordance this project refuses to
- * ship, so the row reports its own limit instead of pretending to be one.
- *
- * @param title the setting's name
- * @param value what it is currently set to, so the row still answers "where am I"
- * @param reason what is missing before it can be changed
- */
-@Composable
-fun LockedRow(
-    title: String,
-    value: String,
-    reason: String,
-) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(title, style = MaterialTheme.typography.titleSmall)
-                Spacer(Modifier.weight(1f))
-                Icon(
-                    imageVector = Icons.Outlined.Lock,
-                    contentDescription = "Not available yet",
-                    tint = OnDarkMuted,
-                    modifier = Modifier.width(16.dp),
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    "Not available",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = OnDarkMuted,
-                )
-            }
-            Text(
-                value,
-                style = MaterialTheme.typography.bodyMedium,
-                color = OnDarkMuted,
-            )
-            Text(
-                reason,
-                style = MaterialTheme.typography.bodySmall,
-                color = OnDarkMuted,
             )
         }
     }

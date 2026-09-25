@@ -1,7 +1,7 @@
 package com.sahil.octacode.domain.model
 
 import com.sahil.octacode.core.model.ModelUserState
-import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * What *this user* has done with each model — which ones they starred, which
@@ -14,8 +14,15 @@ import kotlinx.coroutines.flow.Flow
  */
 interface ModelUserStateRepository {
 
-    /** Reactive, because the selector renders straight off it. */
-    val states: Flow<Map<String, ModelUserState>>
+    /**
+     * Reactive, because the selector renders straight off it.
+     *
+     * A `StateFlow` rather than a `Flow`: what the user has starred already
+     * exists before the first frame, so the picker must not open blank and
+     * then populate — and a caller of a plain flow would have to invent an
+     * initial value that is really just a guess.
+     */
+    val states: StateFlow<Map<String, ModelUserState>>
 
     fun setFavorite(modelId: String, favorite: Boolean)
 

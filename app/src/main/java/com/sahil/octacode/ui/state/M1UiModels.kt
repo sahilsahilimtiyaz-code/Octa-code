@@ -110,14 +110,3 @@ data class ProjectMetricsUi(
     val filesByType: List<FileTypeCountUi>,
     val activity: List<ActivityMonthUi>,
 )
-
-data class ProviderOptionUi(
-    val id: String,
-    val name: String,
-    val description: String,
-    val badge: String,
-    val configured: Boolean,
-    val available: Boolean,
-    val selected: Boolean,
-    val unavailableReason: String? = null,
-)

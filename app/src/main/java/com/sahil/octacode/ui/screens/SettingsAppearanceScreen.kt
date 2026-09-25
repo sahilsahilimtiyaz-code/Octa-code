@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.sahil.octacode.core.settings.Settings
 import com.sahil.octacode.data.settings.SettingsRepository
+import com.sahil.octacode.ui.components.LockedRow
 import com.sahil.octacode.ui.components.SectionHeaderText
 import com.sahil.octacode.ui.theme.OnDarkMuted
 import com.sahil.octacode.ui.theme.codeTextStyle

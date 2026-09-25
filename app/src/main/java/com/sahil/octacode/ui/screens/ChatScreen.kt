@@ -51,16 +51,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sahil.octacode.core.capability.ProviderStatus
+import com.sahil.octacode.core.model.ModelCatalog
+import com.sahil.octacode.core.provider.AiProvider
 import com.sahil.octacode.core.provider.ProviderId
 import com.sahil.octacode.domain.chat.ChatEngine
 import com.sahil.octacode.domain.mission.MissionRepository
 import com.sahil.octacode.domain.mission.MissionStatus
+import com.sahil.octacode.domain.model.ModelUserStateRepository
 import com.sahil.octacode.ui.components.AccentInfoCard
 import com.sahil.octacode.ui.components.AgentHeroCopy
 import com.sahil.octacode.ui.components.AgentStatusPill
 import com.sahil.octacode.ui.components.AgentTopBar
 import com.sahil.octacode.ui.components.ChatBubble
 import com.sahil.octacode.ui.components.ComposerPill
+import com.sahil.octacode.ui.components.ModelSelectorSheet
 import com.sahil.octacode.ui.components.NeonSendButton
 import com.sahil.octacode.ui.components.HeroPlanet
 import com.sahil.octacode.ui.components.ThinkingOrb
@@ -83,11 +87,15 @@ fun ChatScreen(
     onOpenProfile: () -> Unit = {},
     onOpenProjects: () -> Unit = {},
     engine: ChatEngine = koinInject(),
-    repository: MissionRepository = koinInject()
+    repository: MissionRepository = koinInject(),
+    modelState: ModelUserStateRepository = koinInject(),
+    /** Which endpoints have a registered adapter, so the sheet can say so. */
+    adapters: Map<ProviderId, AiProvider> = koinInject(),
 ) {
     val state by engine.state.collectAsState()
+    val modelStates by modelState.states.collectAsState()
     var draft by remember { mutableStateOf("") }
-    var providerMenu by remember { mutableStateOf(false) }
+    var modelSheet by remember { mutableStateOf(false) }
     // Set when send is tapped while the provider is not ready, so the caption
     // under the composer can escalate from a hint to the actual reason.
     var sendBlocked by remember { mutableStateOf(false) }
@@ -128,9 +136,38 @@ fun ChatScreen(
         status == null -> "Probing agent..."
         else -> "Agent unavailable"
     }
-    val modelLabel = when {
-        ready -> "${state.selectedProvider.title} ready"
-        else -> "Model unavailable"
+    // Readiness already lives in agentLabel above; this pill answers the
+    // different question — which model is next to go out.
+    val pickedModel = state.selectedModelId?.let { ModelCatalog.byId(it) }
+    val modelLabel = pickedModel?.displayName ?: state.selectedProvider.title
+
+    if (modelSheet) {
+        ModelSelectorSheet(
+            selectedModelId = state.selectedModelId,
+            selectedProvider = state.selectedProvider,
+            states = modelStates,
+            availableProviders = adapters.keys,
+            busy = state.busy,
+            // Both close and re-probe: selectModel/selectProvider drop the
+            // probe, and leaving the user on "Probing..." with no way to
+            // resolve it would be the half-finished action this app avoids.
+            onSelectModel = { model ->
+                engine.selectModel(model)
+                modelSheet = false
+                scope.launch { engine.refreshProviderStatus() }
+            },
+            onSelectEndpoint = { id ->
+                engine.selectProvider(id)
+                modelSheet = false
+                scope.launch { engine.refreshProviderStatus() }
+            },
+            onToggleFavorite = { model, favorite -> modelState.setFavorite(model.id, favorite) },
+            onRefreshStatus = {
+                modelSheet = false
+                scope.launch { engine.refreshProviderStatus() }
+            },
+            onDismiss = { modelSheet = false },
+        )
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -310,33 +347,9 @@ fun ChatScreen(
                                 modifier = Modifier.size(20.dp)
                             )
                         },
-                        onClick = { providerMenu = true },
+                        onClick = { modelSheet = true },
                         modifier = Modifier.fillMaxWidth()
                     )
-                    DropdownMenu(
-                        expanded = providerMenu,
-                        onDismissRequest = { providerMenu = false }
-                    ) {
-                        ProviderId.entries.forEach { id ->
-                            DropdownMenuItem(
-                                text = {
-                                    Text(if (id == state.selectedProvider) "• ${id.title}" else id.title)
-                                },
-                                onClick = {
-                                    engine.selectProvider(id)
-                                    providerMenu = false
-                                    scope.launch { engine.refreshProviderStatus() }
-                                }
-                            )
-                        }
-                        DropdownMenuItem(
-                            text = { Text("Refresh status") },
-                            onClick = {
-                                providerMenu = false
-                                scope.launch { engine.refreshProviderStatus() }
-                            }
-                        )
-                    }
                 }
                 Box(modifier = Modifier.weight(1f)) {
                     ComposerPill(
