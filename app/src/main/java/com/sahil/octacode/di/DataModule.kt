@@ -9,6 +9,7 @@ import com.sahil.octacode.data.mission.MissionDiffDao
 import com.sahil.octacode.data.mission.PhaseEventDao
 import com.sahil.octacode.data.mission.PhaseRunDao
 import com.sahil.octacode.data.mission.RoomMissionRepository
+import com.sahil.octacode.data.model.ModelUserStateStore
 import com.sahil.octacode.data.settings.SettingsRepository
 import com.sahil.octacode.domain.chat.ChatRepository
 import com.sahil.octacode.domain.chat.RetentionReport
@@ -37,6 +38,10 @@ val dataModule = module {
     // App settings: one store, read as a flow by every screen. Registered here
     // rather than in AppModule because it is persistence, not presentation.
     single<SettingsRepository> { SettingsRepository(androidContext()) }
+
+    // Favorites and recents for the model selector. Beside settings because it
+    // is the same kind of thing: preferences, read as a flow, not secrets.
+    single { ModelUserStateStore(androidContext()) }
 
     // Chat history lives in its own database — see ChatDatabase for why it
     // must not join octa_missions (destructive fallback + no exported schema).
