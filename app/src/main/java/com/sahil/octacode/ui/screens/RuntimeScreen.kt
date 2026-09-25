@@ -38,12 +38,13 @@ import com.sahil.octacode.ui.components.StatusBanner
 import org.koin.compose.koinInject
 
 /**
- * R1: fetch the coding runtime from pinned mirrors and prove every byte.
+ * R2: fetch the coding runtime, prove every byte, and unpack it into a prefix.
  *
- * The screen is deliberately honest about what this milestone does and does not
- * do: artifacts are downloaded, checksum-verified and stored — unpacking them
- * into a working shell is the exec runtime (R2/R3), and this screen says so
- * rather than implying tools already work.
+ * The screen never conflates the two halves: "verified" means the bytes matched
+ * their pinned SHA-256, "installed" means they were afterwards unpacked onto
+ * disk. The files really are there after this milestone — but they are not yet
+ * executable, because Android blocks running anything the app can write. That
+ * is R3, and the screen says so rather than implying `node` already runs.
  */
 @Composable
 fun RuntimeScreen(
@@ -94,7 +95,11 @@ fun RuntimeScreen(
             InfoLine("Architecture", "${manifest.arch} · ${manifest.abi}")
             InfoLine("Pinned", "${manifest.packageCount} artifacts · ${formatBytes(manifest.unionBytes)}")
             InfoLine("Manifest", "generated ${manifest.generated} · schema v${manifest.schema}")
-            InfoLine("Stored", "${state.fetched.size} verified · ${formatBytes(state.totalFetchedBytes())}")
+            InfoLine(
+                "Stored",
+                "${state.fetched.size} verified · ${state.installedCount()} unpacked · " +
+                    formatBytes(state.totalFetchedBytes())
+            )
             Spacer(Modifier.height(6.dp))
             Text(
                 "Every artifact is matched against a SHA-256 pinned inside the APK before it is " +
@@ -106,14 +111,19 @@ fun RuntimeScreen(
 
         val totalPending = state.pendingBytes(manifest)
         val runtimeComplete = state.isComplete(manifest)
+        val runtimeInstalled = manifest.distinctArtifacts().all { state.isInstalled(it.id) }
 
         GlassPanel(title = "Default install") {
             Text(
-                if (runtimeComplete) {
-                    "Full runtime verified — ${manifest.packageCount} artifacts, ${formatBytes(manifest.unionBytes)}"
-                } else {
-                    "${formatBytes(totalPending)} of ${formatBytes(manifest.unionBytes)} remaining · " +
-                        "${state.pendingCount(manifest)} of ${manifest.packageCount} artifacts"
+                when {
+                    runtimeInstalled ->
+                        "Full runtime unpacked — ${manifest.packageCount} artifacts, " +
+                            formatBytes(manifest.unionBytes)
+                    runtimeComplete ->
+                        "All ${manifest.packageCount} artifacts verified; unpacking still pending"
+                    else ->
+                        "${formatBytes(totalPending)} of ${formatBytes(manifest.unionBytes)} remaining · " +
+                            "${state.pendingCount(manifest)} of ${manifest.packageCount} artifacts"
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -121,21 +131,24 @@ fun RuntimeScreen(
             Spacer(Modifier.height(4.dp))
             Button(
                 onClick = { provisioner.installAll() },
-                enabled = !state.busy && !runtimeComplete && supportedAbi,
+                enabled = !state.busy && !runtimeInstalled && supportedAbi,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
                     when {
-                        runtimeComplete -> "Full runtime installed ✓"
+                        runtimeInstalled -> "Full runtime installed ✓"
                         state.busy -> "Installing…"
+                        // Verified bytes already on disk: unpack them, no network.
+                        runtimeComplete -> "Unpack everything (offline)"
                         else -> "Install full runtime (${formatBytes(totalPending)})"
                     }
                 )
             }
             Text(
                 "Runs base userland → PRoot → Node → Python → dev tools → Rust in that order, " +
-                    "including the ~219MB toolchain. Stops at the first failure and keeps " +
-                    "everything already verified.",
+                    "including the ~219MB toolchain. Each package is checksum-verified, then " +
+                    "unpacked into the prefix. Stops at the first failure and keeps everything " +
+                    "already completed.",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -147,6 +160,7 @@ fun RuntimeScreen(
                     group = group,
                     state = state,
                     onInstall = { provisioner.install(group.id) },
+                    onUninstall = { provisioner.uninstall(group.id) },
                     onStop = { provisioner.cancel() },
                     onDismiss = { provisioner.dismissError() }
                 )
@@ -155,9 +169,11 @@ fun RuntimeScreen(
 
         GlassPanel(title = "What happens next") {
             Text(
-                "R1 stores verified artifacts only. Unpacking them into a working shell (bash, " +
-                    "node, python) and wiring them into the mission pipeline lands with the exec " +
-                    "runtime — until then no tool is reported as available.",
+                "R2 unpacks verified artifacts into the app's prefix, so the files are genuinely " +
+                    "on disk, listed, and removable. They are not yet executable — Android refuses " +
+                    "to run anything the app is allowed to write, so making them runnable is the " +
+                    "exec runtime milestone (R3). Until then no tool is reported to the mission " +
+                    "pipeline as available.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -170,7 +186,10 @@ fun RuntimeScreen(
                 enabled = !state.busy,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Delete all downloaded runtime artifacts (${formatBytes(state.totalFetchedBytes())})")
+                Text(
+                    "Delete all runtime artifacts and unpacked files " +
+                        "(${formatBytes(state.totalFetchedBytes())})"
+                )
             }
         }
     }
@@ -181,11 +200,14 @@ private fun GroupCard(
     group: RuntimeGroup,
     state: ProvisionerState,
     onInstall: () -> Unit,
+    onUninstall: () -> Unit,
     onStop: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val complete = state.isComplete(group)
     val fetchedCount = state.fetchedCount(group)
+    val installedCount = state.installedCount(group)
+    val allInstalled = installedCount == group.items.size
     val pendingBytes = state.pendingBytes(group)
     val active = state.activeGroupId == group.id
     val progress = if (active) state.progress else null
@@ -205,7 +227,7 @@ private fun GroupCard(
                 }
                 Spacer(Modifier.weight(1f))
                 Text(
-                    "$fetchedCount/${group.items.size}",
+                    "$fetchedCount/${group.items.size} verified",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -231,11 +253,23 @@ private fun GroupCard(
                 )
             } else {
                 Text(
-                    if (complete) "All ${group.items.size} artifacts verified"
-                    else "${formatBytes(pendingBytes)} to download · ${group.items.size - fetchedCount} remaining",
+                    when {
+                        // Downloaded and unpacked are separate claims; say which holds.
+                        allInstalled -> "All ${group.items.size} unpacked into the prefix"
+                        installedCount > 0 ->
+                            "$installedCount of ${group.items.size} unpacked · " +
+                                "${formatBytes(pendingBytes)} still to download"
+                        complete -> "All ${group.items.size} verified — not unpacked yet"
+                        else ->
+                            "${formatBytes(pendingBytes)} to download · " +
+                                "${group.items.size - fetchedCount} remaining"
+                    },
                     style = MaterialTheme.typography.labelMedium,
-                    color = if (complete) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant
+                    color = when {
+                        allInstalled -> MaterialTheme.colorScheme.primary
+                        complete || installedCount > 0 -> MaterialTheme.colorScheme.primary
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    }
                 )
             }
 
@@ -252,16 +286,24 @@ private fun GroupCard(
                     active -> Button(onClick = onStop, modifier = Modifier.weight(1f)) {
                         Text("Stop")
                     }
-                    complete -> Button(
+                    allInstalled -> Button(
                         onClick = onInstall,
                         enabled = !state.busy,
                         modifier = Modifier.weight(1f)
                     ) { Text("Re-verify (offline)") }
+                    complete -> Button(
+                        onClick = onInstall,
+                        enabled = !state.busy,
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Unpack (offline)") }
                     else -> Button(
                         onClick = onInstall,
                         enabled = !state.busy,
                         modifier = Modifier.weight(1f)
                     ) { Text("Install (${formatBytes(pendingBytes)})") }
+                }
+                if (!active && installedCount > 0 && !state.busy) {
+                    TextButton(onClick = onUninstall) { Text("Uninstall") }
                 }
                 if (error != null && !state.busy) {
                     TextButton(onClick = onDismiss) { Text("Dismiss") }

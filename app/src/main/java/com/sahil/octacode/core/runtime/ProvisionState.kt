@@ -39,6 +39,16 @@ data class ProvisionerState(
 ) {
     fun isFetched(artifactId: String): Boolean = fetched.containsKey(artifactId)
 
+    /** Verified AND unpacked — strictly stronger than [isFetched], never implied by it. */
+    fun isInstalled(artifactId: String): Boolean = fetched[artifactId]?.isInstalled == true
+
+    fun installedCount(): Int = fetched.values.count { it.isInstalled }
+
+    fun installedCount(group: RuntimeGroup): Int = group.items.count { isInstalled(it.id) }
+
+    /** Every artifact of the group is unpacked, not merely downloaded. */
+    fun isInstalled(group: RuntimeGroup): Boolean = installedCount(group) == group.items.size
+
     fun fetchedCount(group: RuntimeGroup): Int = group.items.count { fetched.containsKey(it.id) }
 
     fun totalFetchedBytes(): Long = fetched.values.sumOf { it.bytes }

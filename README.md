@@ -132,12 +132,57 @@ Native Android AI coding workstation. No legacy, no stubs wired as real.
   Re-verify with real byte progress, honest "n/m verified · X to download", ABI gate that
   refuses to download anything on a non-arm64 device, delete-all.
 - Still honest about the milestone: artifacts are **fetched and verified** here; unpacking
-  them into a working shell and wiring them into `which()` is R2/R3. No tool is reported
+  them into a working shell and wiring them into `which()` is R2. No tool is reported
   available until it actually is.
 - Unit tests: manifest pin validation, downloader (fresh / resume / mismatch / truncated /
   reuse-without-network / retry / 404), ledger (round-trip / corruption / atomicity),
   provisioner end-to-end (install / idempotent / stop-on-failure / mismatch / offline
   re-verify / full install with cross-group dedup / queue stop at first failure).
+
+### R2 Unpacking (the files land on disk)
+- `core/runtime/extract/` — hand-written `ar` and `tar` readers plus one new dependency,
+  `org.tukaani:xz` (pure Java, 169KB), because Termux ships **`data.tar.xz`** in every
+  package sampled, including the 125MB `rust`. LZMA2 has no JDK or Android equivalent, and
+  the path handling was never going to be delegated anyway.
+- Two things about these packages were **measured against the live mirrors before the code
+  was written**, not assumed:
+  - entries are *not* package-relative. Every one embeds the whole Termux prefix —
+    `./data/data/com.termux/files/usr/bin/bash` — so naive extraction would bury the
+    runtime under `prefix/data/data/com.termux/...`. A scan of the 49-package `base` group
+    (4,274 entries) found every path either under that prefix or part of the chain of
+    directories leading to it — **nothing outside it**.
+  - that scan found **1,016 symlinks** (52 using `..`, all of which stay inside), **2
+    absolute** ones — `bzip2`'s `bin/bzcmp -> /data/data/com.termux/files/usr/bin/bzdiff` —
+    no hardlinks, no devices, no traversal paths, and a worst-case expansion of **10.5x**
+    (which is what the 16x/128MB decompression-bomb cap is sized against).
+- **Path safety** is judged per entry and never guessed at: `Place` (under the prefix),
+  `Ignore` (the prefix's own directory chain, present in every package and not an anomaly),
+  `Refuse` (anything outside — dropped and counted, never written). A `..` that climbs past
+  the root **fails the whole extraction**; writing a file also re-checks that its parent
+  still resolves inside the root, so a symlink planted by an earlier entry cannot be used
+  to write to `/sdcard`. Absolute link targets into the original Termux prefix are rewritten
+  to relative ones; other absolute links are dropped and counted.
+- `ArtifactInstaller` — unpacks into a **staging directory first**, then moves into the
+  prefix, so a malformed package can never leave half a tree behind claiming to be
+  installed. A failure partway through the move rolls back what it placed. Uninstall
+  deletes only paths **no other package claims**, then prunes directories that are empty.
+- `RuntimeLedger` — records gain `installedFiles` / `installedAtMillis` / `skippedEntries`,
+  so *verified* and *unpacked* are two independent claims and are never conflated.
+  Re-verifying a cached artifact preserves the unpacked state; uninstalling keeps the
+  verification (the bytes are still proven good) and drops only the unpacked claim.
+- `RuntimeIndex` — `commandPath("bash")` answers from recorded `bin/` and `sbin/` paths
+  only, so `which("COPYING")` cannot resolve to a licence document, and a dangling symlink
+  resolves to `null` rather than to a path that cannot work.
+- Runtime screen — per-group **Unpack (offline)** and **Uninstall**, honest
+  "n/m verified · k unpacked", and the full-install button switches to
+  "Unpack everything (offline)" once every byte is already cached.
+- Still honest: the files are genuinely on disk and removable, but they are **not yet
+  executable** — Android refuses to run anything the app is allowed to write. That is R3.
+- Unit tests: `DebFixtures` builds real `.deb` archives in memory (`ar` + `tar` + xz) so
+  the unpacker is exercised against the byte layout a download will actually have — prefix
+  stripping, symlink creation and rewriting, refused paths, traversal, bomb cap, corrupt
+  header checksum, non-deb input — plus installer install/uninstall/shared-path and index
+  lookup suites. **148 tests, all passing** (`:app:testDebugUnitTest`).
 
 ## Setup
 1. Copy this folder into your projects directory.
@@ -155,7 +200,7 @@ Native Android AI coding workstation. No legacy, no stubs wired as real.
 
 ### Runtime (on-device coding environment)
 - **R1** Pinned manifest + downloader + verification ledger + Runtime screen — **done**
-- **R2** Unpack `.deb` → `$PREFIX`, `RuntimeIndex` teaching `which()` about runtime tools
+- **R2** Unpack `.deb` → `$PREFIX`, `RuntimeIndex`, install/uninstall — **done**
 - **R3** Exec bootstrap (jniLibs `lib*.so` + PRoot) — Android 10+ W^X compliance
 - **R4** PRoot rootfs + base userland → real shell in Terminal
 - **R5** Node/npm → install OpenCode / Claude Code CLI → stream into Chat

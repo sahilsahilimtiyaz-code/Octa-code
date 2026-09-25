@@ -14,19 +14,23 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * Drives installation of runtime groups: download → verify → record.
+ * Drives installation of runtime groups: download → verify → unpack.
  *
  * Contract:
  *  - Only artifacts whose SHA-256 matched the pinned value enter the ledger.
+ *  - Only ledgered artifacts get unpacked, and only unpacked ones count as
+ *    installed — "downloaded" and "on disk" are never conflated.
  *  - A group stops at the first failure and says why (never "succeeded" anyway).
- *  - Re-running an install is idempotent: anything already verified is skipped,
- *    and a byte-perfect file already in the cache is re-verified with no network.
- *    That is also the recovery path if the ledger file is ever lost or damaged.
+ *  - Re-running an install is idempotent: anything already verified AND unpacked
+ *    is skipped, and a byte-perfect file already in the cache is re-verified with
+ *    no network. That is also the recovery path if the ledger file is ever lost
+ *    or damaged, or if an earlier unpack failed and left nothing behind.
  */
 class RuntimeProvisioner(
     private val manifest: RuntimeManifest,
     private val ledger: RuntimeLedger,
     private val downloader: ArtifactDownloader,
+    private val installer: ArtifactInstaller,
     private val cacheDir: File
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -73,6 +77,15 @@ class RuntimeProvisioner(
      */
     fun installAll() = runQueue(manifest.groups.map { it.id })
 
+    /**
+     * True when this artifact still owes the user work: not fetched yet, or
+     * fetched but never (successfully) unpacked.
+     */
+    private fun needsWork(artifact: RuntimeArtifact): Boolean {
+        val record = ledger.get(artifact.id) ?: return true
+        return !record.isInstalled
+    }
+
     private fun runQueue(groupIds: List<String>) {
         if (_state.value.busy) return
 
@@ -80,7 +93,7 @@ class RuntimeProvisioner(
         // can be published before the coroutine starts. Group membership is only
         // a hint here — the real plan is re-resolved per group inside the run.
         val planned = groupIds.filter { id ->
-            manifest.group(id)?.items?.any { !ledger.contains(it.id) } == true
+            manifest.group(id)?.items?.any { needsWork(it) } == true
         }
 
         if (planned.isEmpty()) {
@@ -102,8 +115,8 @@ class RuntimeProvisioner(
                 for (groupId in planned) {
                     val group = manifest.group(groupId) ?: continue
                     // Re-resolved HERE: an artifact already handled by an earlier
-                    // group in this same queue must not be downloaded twice.
-                    val pending = group.items.filterNot { ledger.contains(it.id) }
+                    // group in this same queue must not be downloaded or unpacked twice.
+                    val pending = group.items.filter { needsWork(it) }
                     if (pending.isEmpty()) continue
                     // First failure ends the whole queue — nothing after it is
                     // claimed as done, and everything verified so far is kept.
@@ -170,6 +183,18 @@ class RuntimeProvisioner(
             when (outcome) {
                 is ArtifactDownloader.Outcome.Verified -> {
                     ledger.markVerified(artifact)
+                    // Verified means the bytes are good; it does not mean the
+                    // tool is on disk yet. Unpack it now or say why not.
+                    when (val installed = installer.install(artifact, target)) {
+                        is InstallResult.Failed -> {
+                            fail(groupId, artifact.id, installed.reason, retryable = true)
+                            return false
+                        }
+                        // A few refused entries do not make a 4000-file package
+                        // unusable; they are counted on the record and shown.
+                        is InstallResult.Installed -> Unit
+                        is InstallResult.AlreadyInstalled -> Unit
+                    }
                     groupDone += artifact.size
                     _state.update {
                         it.copy(
@@ -230,10 +255,54 @@ class RuntimeProvisioner(
         }
     }
 
-    /** Drop every verified record and cached artifact. Irreversible. */
+    /**
+     * Unpack every installed artifact of a group back out of the prefix.
+     * Nothing is deleted that another package still claims.
+     */
+    fun uninstall(groupId: String) {
+        if (_state.value.busy) return
+        val group = manifest.group(groupId)
+        if (group == null) {
+            fail(null, null, "Unknown runtime group '$groupId'", retryable = false)
+            return
+        }
+        _state.update {
+            it.copy(busy = true, activeGroupId = groupId, lastError = null, progress = null)
+        }
+        job = scope.launch {
+            var problem: String? = null
+            try {
+                for (artifact in group.items) {
+                    currentCoroutineContext().ensureActive()
+                    when (val result = installer.uninstall(artifact.id)) {
+                        is UninstallResult.Failed -> {
+                            problem = result.reason
+                            break
+                        }
+                        else -> Unit
+                    }
+                }
+            } finally {
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        activeGroupId = null,
+                        progress = null,
+                        fetched = ledger.snapshot(),
+                        lastError = problem?.let { reason ->
+                            ProvisionError(groupId, null, reason, retryable = false)
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    /** Drop every verified record, cached artifact and unpacked file. Irreversible. */
     fun clearAll() {
         job?.cancel()
         cacheDir.listFiles()?.forEach { runCatching { it.delete() } }
+        installer.removeAll()
         ledger.clear()
         _state.update { ProvisionerState(fetched = ledger.snapshot()) }
     }

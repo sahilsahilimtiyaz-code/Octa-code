@@ -24,11 +24,17 @@ class RuntimeProvisionerTest {
 
     private lateinit var dir: File
     private lateinit var cache: File
+    private lateinit var prefix: File
     private lateinit var ledgerFile: File
 
-    private val alpha = ByteArray(70_000) { (it % 199).toByte() }
-    private val beta = ByteArray(40_000) { (it % 173).toByte() }
-    private val gamma = ByteArray(30_000) { (it % 151).toByte() }
+    // Real `.deb` archives, not raw bytes: every install now unpacks, so a test
+    // that only proved the download would be proving the wrong half.
+    private val alpha = DebFixtures.debOf(
+        "bin/alpha" to "alpha-1.0",
+        "share/doc/alpha/readme" to "the first tool"
+    )
+    private val beta = DebFixtures.debOf("bin/beta" to "beta-1.0")
+    private val gamma = DebFixtures.debOf("bin/gamma" to "gamma-1.0")
 
     private lateinit var manifest: RuntimeManifest
 
@@ -36,6 +42,7 @@ class RuntimeProvisionerTest {
     fun setUp() {
         dir = File(System.getProperty("java.io.tmpdir"), "octa-prov-${System.nanoTime()}").apply { mkdirs() }
         cache = File(dir, "cache").apply { mkdirs() }
+        prefix = File(dir, "prefix")
         ledgerFile = File(dir, "ledger.json")
 
         val baseItems = listOf(
@@ -107,12 +114,18 @@ class RuntimeProvisionerTest {
             }
         })
 
-    private fun newProvisioner(client: HttpClient) = RuntimeProvisioner(
-        manifest = manifest,
-        ledger = RuntimeLedger(ledgerFile),
-        downloader = ArtifactDownloader(client),
-        cacheDir = cache
-    )
+    private fun newProvisioner(client: HttpClient): RuntimeProvisioner {
+        // One ledger shared with its installer, so a provisioner never sees a
+        // different view of what is installed than the thing doing the installing.
+        val ledger = RuntimeLedger(ledgerFile)
+        return RuntimeProvisioner(
+            manifest = manifest,
+            ledger = ledger,
+            downloader = ArtifactDownloader(client),
+            installer = ArtifactInstaller(prefix, ledger),
+            cacheDir = cache
+        )
+    }
 
     /** The real on-device path for an artifact — derived, never hand-typed. */
     private fun cached(id: String): File =
@@ -144,6 +157,17 @@ class RuntimeProvisionerTest {
         assertEquals(manifest.group("base")!!.totalBytes, final.totalFetchedBytes())
         assertArrayEquals(alpha, cached("alpha").readBytes())
         assertTrue(final.isComplete(manifest.group("base")!!))
+
+        // Downloaded AND unpacked are two different claims; both must hold.
+        assertEquals(2, final.installedCount())
+        assertTrue(final.isInstalled(manifest.group("base")!!))
+        assertEquals("alpha-1.0", File(prefix, "bin/alpha").readText())
+        assertEquals(
+            "nested paths must land where they were written in the archive",
+            "the first tool",
+            File(prefix, "share/doc/alpha/readme").readText()
+        )
+        assertEquals("beta-1.0", File(prefix, "bin/beta").readText())
     }
 
     @Test
@@ -264,6 +288,10 @@ class RuntimeProvisionerTest {
         assertTrue(cached("alpha").isFile)
         assertTrue(cached("beta").isFile)
         assertTrue(cached("gamma").isFile)
+        // "Complete" must mean on disk, not merely downloaded.
+        assertEquals("every package should be unpacked", 3, final.installedCount())
+        assertEquals("beta-1.0", File(prefix, "bin/beta").readText())
+        assertEquals("gamma-1.0", File(prefix, "bin/gamma").readText())
     }
 
     @Test

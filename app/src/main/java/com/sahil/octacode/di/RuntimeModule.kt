@@ -1,7 +1,9 @@
 package com.sahil.octacode.di
 
 import com.sahil.octacode.core.runtime.ArtifactDownloader
+import com.sahil.octacode.core.runtime.ArtifactInstaller
 import com.sahil.octacode.core.runtime.BundledRuntimeManifest
+import com.sahil.octacode.core.runtime.RuntimeIndex
 import com.sahil.octacode.core.runtime.RuntimeLedger
 import com.sahil.octacode.core.runtime.RuntimeManifest
 import com.sahil.octacode.core.runtime.RuntimeProvisioner
@@ -10,8 +12,10 @@ import java.io.File
 import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
 
-// R1 runtime provisioning graph: bundled manifest → downloader (own client, no
-// request cap) → verification ledger → provisioner. Consumed by RuntimeScreen.
+// R1/R2 runtime graph: bundled manifest → downloader (own client, no request
+// cap) → verification ledger → installer → provisioner, plus the index that
+// answers "where is tool X" from what is genuinely on disk. Consumed by
+// RuntimeScreen.
 val runtimeModule = module {
     single<RuntimeManifest> { BundledRuntimeManifest(androidContext().assets).load() }
 
@@ -21,11 +25,17 @@ val runtimeModule = module {
     // request timeout of the shared API client.
     single { ArtifactDownloader(KtorHttpFactory.createDownloadClient()) }
 
+    // Everything unpacks into one prefix, Termux-style.
+    single { ArtifactInstaller(File(androidContext().filesDir, "runtimes/prefix"), get()) }
+
+    single { RuntimeIndex(File(androidContext().filesDir, "runtimes/prefix"), get()) }
+
     single {
         RuntimeProvisioner(
             manifest = get(),
             ledger = get(),
             downloader = get(),
+            installer = get(),
             cacheDir = File(androidContext().filesDir, "runtimes/cache")
         )
     }

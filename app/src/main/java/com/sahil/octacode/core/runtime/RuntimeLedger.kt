@@ -7,6 +7,11 @@ import kotlinx.serialization.json.Json
 /**
  * Proof that a specific artifact's bytes matched its pinned SHA-256.
  * This is the ONLY thing that lets a download be treated as usable.
+ *
+ * [installedFiles] adds a second, independent claim: that those bytes were
+ * afterwards unpacked into the prefix, and which paths that produced. An empty
+ * list therefore means "verified but not unpacked" — the two are never
+ * conflated, so the screen can say exactly what is and is not on disk yet.
  */
 @Serializable
 data class ArtifactRecord(
@@ -14,8 +19,15 @@ data class ArtifactRecord(
     val version: String,
     val sha256: String,
     val bytes: Long,
-    val verifiedAtMillis: Long
-)
+    val verifiedAtMillis: Long,
+    /** Paths this package placed under the prefix, relative to it. */
+    val installedFiles: List<String> = emptyList(),
+    val installedAtMillis: Long = 0,
+    /** Entries dropped because they had no meaning here (surfaced, never silent). */
+    val skippedEntries: Int = 0
+) {
+    val isInstalled: Boolean get() = installedFiles.isNotEmpty()
+}
 
 /** Versioned ledger file — kept separate from schema so a corrupt file is detectable. */
 @Serializable
@@ -71,17 +83,71 @@ class RuntimeLedger(
 
     @Synchronized
     fun markVerified(artifact: RuntimeArtifact): ArtifactRecord {
+        // Re-verifying must not erase what is already unpacked on disk: a lost
+        // or damaged ledger rebuilds itself by re-hashing the cache.
+        val previous = loaded()[artifact.id]
         val record = ArtifactRecord(
             id = artifact.id,
             version = artifact.version,
             sha256 = artifact.sha256,
             bytes = artifact.size,
-            verifiedAtMillis = clock()
+            verifiedAtMillis = clock(),
+            installedFiles = previous?.installedFiles.orEmpty(),
+            installedAtMillis = previous?.installedAtMillis ?: 0,
+            skippedEntries = previous?.skippedEntries ?: 0
         )
         loaded()[artifact.id] = record
         persist()
         return record
     }
+
+    /**
+     * Records what unpacking [id] actually put on disk.
+     * Returns null if the artifact was never verified — an unverified artifact
+     * is never allowed to claim any path.
+     */
+    @Synchronized
+    fun markInstalled(id: String, files: List<String>, skipped: Int): ArtifactRecord? {
+        val current = loaded()[id] ?: return null
+        val record = current.copy(
+            installedFiles = files,
+            installedAtMillis = clock(),
+            skippedEntries = skipped
+        )
+        loaded()[id] = record
+        persist()
+        return record
+    }
+
+    /**
+     * Drops the unpacked claim but keeps the verification, so uninstalling does
+     * not throw away proof that the cached bytes are good.
+     */
+    @Synchronized
+    fun markUninstalled(id: String) {
+        val current = loaded()[id] ?: return
+        loaded()[id] = current.copy(
+            installedFiles = emptyList(),
+            installedAtMillis = 0,
+            skippedEntries = 0
+        )
+        persist()
+    }
+
+    /**
+     * Paths every package EXCEPT [id] lays claim to. An uninstall may only
+     * delete what no other package still needs — removing a shared file would
+     * quietly break something the user did not ask us to touch.
+     */
+    @Synchronized
+    fun filesClaimedByOthers(id: String): Set<String> =
+        loaded()
+            .filterKeys { it != id }
+            .values
+            .flatMapTo(HashSet()) { it.installedFiles }
+
+    @Synchronized
+    fun installedIds(): List<String> = loaded().values.filter { it.isInstalled }.map { it.id }
 
     @Synchronized
     fun remove(id: String) {

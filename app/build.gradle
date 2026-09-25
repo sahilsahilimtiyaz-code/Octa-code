@@ -103,4 +103,8 @@ dependencies {
     testImplementation 'org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1'
     // R1 runtime download tests — fake HTTP without touching the network
     testImplementation 'io.ktor:ktor-client-mock:2.3.12'
+    // R2: Termux ships data.tar.xz, and LZMA2 has no JDK/Android equivalent.
+    // Pure-Java, 169KB, Java 8 bytecode — ar/tar themselves are hand-written
+    // below so path-safety stays under our control.
+    implementation 'org.tukaani:xz:1.12'
 }
