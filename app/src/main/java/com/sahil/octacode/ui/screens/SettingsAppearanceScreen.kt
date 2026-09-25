@@ -13,7 +13,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -59,20 +58,26 @@ fun SettingsAppearanceScreen(
             Text("Appearance", style = MaterialTheme.typography.headlineMedium)
         }
 
-        FontSizeSlider(
+        SettingSlider(
             title = "UI font size",
             description = "Labels, chat text and controls. Rows stay the same height, so a " +
                 "smaller size fits more on screen.",
+            display = "${Math.round(settings.uiFontScale * 100)}%",
             value = settings.uiFontScale,
+            valueRange = Settings.MIN_FONT_SCALE..Settings.MAX_FONT_SCALE,
+            steps = FONT_STEPS,
             onChange = { scale ->
                 repository.update { s -> s.copy(uiFontScale = scale) }
             },
         )
-        FontSizeSlider(
+        SettingSlider(
             title = "Code font size",
             description = "Diffs, phase labels and the event stream. Kept separate — code is " +
                 "read differently from the interface around it.",
+            display = "${Math.round(settings.codeFontScale * 100)}%",
             value = settings.codeFontScale,
+            valueRange = Settings.MIN_FONT_SCALE..Settings.MAX_FONT_SCALE,
+            steps = FONT_STEPS,
             onChange = { scale ->
                 repository.update { s -> s.copy(codeFontScale = scale) }
             },
@@ -122,44 +127,11 @@ fun SettingsAppearanceScreen(
 }
 
 /**
- * A slider over [Settings]' legal font range, showing the value as a percentage
- * so "1.15" reads as the thing it actually means.
+ * Slider intervals across the legal font range, minus the two endpoints the
+ * API counts itself.
+ *
+ * roundToInt, not toInt: 0.75f / 0.05f lands just under 15 in floating point,
+ * and truncating that would silently widen the step to 5.7%.
  */
-@Composable
-private fun FontSizeSlider(
-    title: String,
-    description: String,
-    value: Float,
-    onChange: (Float) -> Unit,
-) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(
-            Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(title, style = MaterialTheme.typography.titleSmall)
-                Spacer(Modifier.weight(1f))
-                Text(
-                    "${Math.round(value * 100)}%",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = OnDarkMuted,
-                )
-            }
-            Text(description, style = MaterialTheme.typography.bodySmall, color = OnDarkMuted)
-            // steps = intervals minus the two endpoints the API counts itself.
-            // roundToInt, not toInt: 0.75f / 0.05f lands just under 15 in
-            // floating point, and truncating that would silently widen the step.
-            val steps = ((Settings.MAX_FONT_SCALE - Settings.MIN_FONT_SCALE) / STEP)
-                .roundToInt() - 1
-            Slider(
-                value = value,
-                onValueChange = onChange,
-                valueRange = Settings.MIN_FONT_SCALE..Settings.MAX_FONT_SCALE,
-                steps = steps,
-            )
-        }
-    }
-}
-
-private const val STEP = 0.05f
+private val FONT_STEPS = ((Settings.MAX_FONT_SCALE - Settings.MIN_FONT_SCALE) / 0.05f)
+    .roundToInt() - 1

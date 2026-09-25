@@ -14,6 +14,8 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -116,6 +118,95 @@ fun LockedRow(
                 reason,
                 style = MaterialTheme.typography.bodySmall,
                 color = OnDarkMuted,
+            )
+        }
+    }
+}
+
+/**
+ * A boolean setting: title, what it does, and the switch itself.
+ *
+ * The description is required rather than optional on purpose — an unexplained
+ * switch is the one kind of control a user has to guess at.
+ */
+@Composable
+fun ToggleCard(
+    title: String,
+    description: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Card(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(
+                Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(title, style = MaterialTheme.typography.titleSmall)
+                Text(
+                    description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OnDarkMuted,
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Switch(checked = checked, onCheckedChange = onCheckedChange)
+        }
+    }
+}
+
+/**
+ * A setting on a discrete range: title, its value rendered by the caller,
+ * and the track.
+ *
+ * [display] is a parameter rather than a formatted number because these cards
+ * answer to different units — a percentage for type size, a plain count for a
+ * chat limit — and neither belongs in a shared component.
+ *
+ * [description] is nullable: some of these explain themselves only while a
+ * parent rule is switched off, and saying so then is the useful case.
+ */
+@Composable
+fun SettingSlider(
+    title: String,
+    description: String?,
+    display: String,
+    value: Float,
+    valueRange: ClosedFloatingPointRange<Float>,
+    steps: Int,
+    onChange: (Float) -> Unit,
+) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(
+            Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(title, style = MaterialTheme.typography.titleSmall)
+                Spacer(Modifier.weight(1f))
+                Text(
+                    display,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = OnDarkMuted,
+                )
+            }
+            if (description != null) {
+                Text(
+                    description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OnDarkMuted,
+                )
+            }
+            Slider(
+                value = value,
+                onValueChange = onChange,
+                valueRange = valueRange,
+                steps = steps,
             )
         }
     }

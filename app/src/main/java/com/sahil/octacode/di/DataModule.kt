@@ -11,6 +11,7 @@ import com.sahil.octacode.data.mission.PhaseRunDao
 import com.sahil.octacode.data.mission.RoomMissionRepository
 import com.sahil.octacode.data.settings.SettingsRepository
 import com.sahil.octacode.domain.chat.ChatRepository
+import com.sahil.octacode.domain.chat.RetentionReport
 import com.sahil.octacode.domain.mission.MissionRepository
 import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
@@ -42,4 +43,8 @@ val dataModule = module {
     single<ChatDatabase> { ChatDatabase.build(androidContext()) }
     single<ChatDao> { get<ChatDatabase>().chatDao() }
     single<ChatRepository> { RoomChatRepository(dao = get()) }
+
+    // What the startup retention pass did. Registered beside the repositories
+    // because it is reported state about data, not a screen's own concern.
+    single { RetentionReport() }
 }

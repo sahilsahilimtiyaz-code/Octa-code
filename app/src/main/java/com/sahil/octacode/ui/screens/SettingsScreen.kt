@@ -30,6 +30,7 @@ import com.sahil.octacode.ui.components.SectionHeaderText
 @Composable
 fun SettingsScreen(
     onOpenAppearance: () -> Unit = {},
+    onOpenSessions: () -> Unit = {},
     onOpenProviders: () -> Unit = {},
     onOpenAutonomy: () -> Unit = {},
     onOpenRuntime: () -> Unit = {},
@@ -47,6 +48,11 @@ fun SettingsScreen(
             title = "Appearance",
             subtitle = "Text size, theme and syntax highlighting",
             onClick = onOpenAppearance,
+        )
+        SettingsNavRow(
+            title = "Sessions",
+            subtitle = "Retention, archiving and stored conversations",
+            onClick = onOpenSessions,
         )
         SettingsNavRow(
             title = "Providers",
