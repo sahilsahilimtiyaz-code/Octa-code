@@ -1113,8 +1113,8 @@
     {
       "id": "rust",
       "title": "Rust toolchain",
-      "description": "Optional (~213MB with clang/llvm) \u2014 only when a build needs cargo",
-      "optional": true,
+      "description": "rustc, cargo, clang/llvm + NDK sysroot \u2014 part of the default install",
+      "optional": false,
       "totalBytes": 219174872,
       "items": [
         {

@@ -50,4 +50,16 @@ data class ProvisionerState(
     fun pendingCount(group: RuntimeGroup): Int = group.items.count { !fetched.containsKey(it.id) }
 
     fun isComplete(group: RuntimeGroup): Boolean = pendingCount(group) == 0
+
+    /**
+     * Cost of installing EVERYTHING still missing, counting packages shared
+     * between group closures once — this is what the full-install button charges.
+     */
+    fun pendingBytes(manifest: RuntimeManifest): Long =
+        manifest.distinctArtifacts().filterNot { fetched.containsKey(it.id) }.sumOf { it.size }
+
+    fun pendingCount(manifest: RuntimeManifest): Int =
+        manifest.distinctArtifacts().count { !fetched.containsKey(it.id) }
+
+    fun isComplete(manifest: RuntimeManifest): Boolean = pendingCount(manifest) == 0
 }

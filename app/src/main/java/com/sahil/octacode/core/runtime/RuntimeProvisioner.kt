@@ -56,112 +56,58 @@ class RuntimeProvisioner(
     /** True while any install is running (only one runs at a time). */
     fun isBusy(): Boolean = _state.value.busy
 
+    /** Install a single group (the per-group button on the Runtime screen). */
     fun install(groupId: String) {
-        val group = manifest.group(groupId)
-        if (group == null) {
+        if (manifest.group(groupId) == null) {
             fail(null, null, "Unknown runtime group '$groupId'", retryable = false)
             return
         }
+        runQueue(listOf(groupId))
+    }
+
+    /**
+     * Install EVERY group in manifest order — the default install.
+     *
+     * Rust is part of this set, so one action yields a complete runtime instead of
+     * a partial one. The screen always quotes the real bytes before it is pressed.
+     */
+    fun installAll() = runQueue(manifest.groups.map { it.id })
+
+    private fun runQueue(groupIds: List<String>) {
         if (_state.value.busy) return
 
-        val pending = group.items.filterNot { ledger.contains(it.id) }
-        if (pending.isEmpty()) {
+        // Up-front pass: decide whether there is anything to do at all, so `busy`
+        // can be published before the coroutine starts. Group membership is only
+        // a hint here — the real plan is re-resolved per group inside the run.
+        val planned = groupIds.filter { id ->
+            manifest.group(id)?.items?.any { !ledger.contains(it.id) } == true
+        }
+
+        if (planned.isEmpty()) {
             _state.update { it.copy(fetched = ledger.snapshot(), lastError = null) }
             return
         }
 
-        val groupTotal = pending.sumOf { it.size }
-        var groupDone = 0L
-
-        // Busy is published BEFORE the coroutine starts so callers never observe a
-        // launched-but-not-yet-running install as idle.
         _state.update {
-            it.copy(busy = true, activeGroupId = groupId, lastError = null, progress = null)
+            it.copy(
+                busy = true,
+                activeGroupId = planned.first(),
+                lastError = null,
+                progress = null
+            )
         }
 
         job = scope.launch {
             try {
-                for ((index, artifact) in pending.withIndex()) {
-                    currentCoroutineContext().ensureActive()
-                    val target = File(cacheDir, artifact.cacheName)
-                    _state.update {
-                        it.copy(
-                            progress = GroupProgress(
-                                groupId = groupId,
-                                itemId = artifact.id,
-                                itemIndex = index + 1,
-                                itemCount = pending.size,
-                                itemBytesDone = 0L,
-                                itemBytesTotal = artifact.size,
-                                groupBytesDone = groupDone,
-                                groupBytesTotal = groupTotal
-                            )
-                        )
-                    }
-
-                    val outcome = downloader.download(
-                        url = manifest.urlFor(artifact),
-                        expectedSha256 = artifact.sha256,
-                        expectedSize = artifact.size,
-                        target = target
-                    ) { done, _ ->
-                        _state.update { s ->
-                            val running = s.progress
-                            if (s.activeGroupId == groupId && running != null && running.itemId == artifact.id) {
-                                s.copy(
-                                    progress = running.copy(
-                                        itemBytesDone = done,
-                                        itemBytesTotal = artifact.size,
-                                        groupBytesDone = groupDone + done
-                                    )
-                                )
-                            } else {
-                                s
-                            }
-                        }
-                    }
-
-                    when (outcome) {
-                        is ArtifactDownloader.Outcome.Verified -> {
-                            ledger.markVerified(artifact)
-                            groupDone += artifact.size
-                            _state.update {
-                                it.copy(
-                                    fetched = ledger.snapshot(),
-                                    progress = it.progress?.copy(
-                                        itemBytesDone = artifact.size,
-                                        groupBytesDone = groupDone
-                                    )
-                                )
-                            }
-                        }
-                        is ArtifactDownloader.Outcome.HashMismatch -> {
-                            fail(
-                                groupId, artifact.id,
-                                "Checksum mismatch on ${artifact.id} ${artifact.version} — expected " +
-                                    "${outcome.expected.take(12)}…, received ${outcome.actual.take(12)}…. " +
-                                    "The file was deleted rather than trusted.",
-                                retryable = true
-                            )
-                            return@launch
-                        }
-                        is ArtifactDownloader.Outcome.HttpError -> {
-                            fail(
-                                groupId, artifact.id,
-                                "HTTP ${outcome.status} fetching ${artifact.id} ${artifact.version} — ${outcome.message}",
-                                retryable = outcome.status == 429 || outcome.status in 500..599
-                            )
-                            return@launch
-                        }
-                        is ArtifactDownloader.Outcome.Failed -> {
-                            fail(
-                                groupId, artifact.id,
-                                "Downloading ${artifact.id} ${artifact.version} — ${outcome.reason}",
-                                retryable = true
-                            )
-                            return@launch
-                        }
-                    }
+                for (groupId in planned) {
+                    val group = manifest.group(groupId) ?: continue
+                    // Re-resolved HERE: an artifact already handled by an earlier
+                    // group in this same queue must not be downloaded twice.
+                    val pending = group.items.filterNot { ledger.contains(it.id) }
+                    if (pending.isEmpty()) continue
+                    // First failure ends the whole queue — nothing after it is
+                    // claimed as done, and everything verified so far is kept.
+                    if (!fetchGroup(group, pending)) return@launch
                 }
             } finally {
                 _state.update {
@@ -169,6 +115,101 @@ class RuntimeProvisioner(
                 }
             }
         }
+    }
+
+    /**
+     * Downloads and verifies every pending artifact of one group, in order.
+     * Returns false if it stopped early — [fail] has already recorded the real
+     * reason, and the caller tears the run down.
+     */
+    private suspend fun fetchGroup(group: RuntimeGroup, pending: List<RuntimeArtifact>): Boolean {
+        val groupId = group.id
+        val groupTotal = pending.sumOf { it.size }
+        var groupDone = 0L
+
+        for ((index, artifact) in pending.withIndex()) {
+            currentCoroutineContext().ensureActive()
+            val target = File(cacheDir, artifact.cacheName)
+            _state.update {
+                it.copy(
+                    progress = GroupProgress(
+                        groupId = groupId,
+                        itemId = artifact.id,
+                        itemIndex = index + 1,
+                        itemCount = pending.size,
+                        itemBytesDone = 0L,
+                        itemBytesTotal = artifact.size,
+                        groupBytesDone = groupDone,
+                        groupBytesTotal = groupTotal
+                    )
+                )
+            }
+
+            val outcome = downloader.download(
+                url = manifest.urlFor(artifact),
+                expectedSha256 = artifact.sha256,
+                expectedSize = artifact.size,
+                target = target
+            ) { done, _ ->
+                _state.update { s ->
+                    val running = s.progress
+                    if (s.activeGroupId == groupId && running != null && running.itemId == artifact.id) {
+                        s.copy(
+                            progress = running.copy(
+                                itemBytesDone = done,
+                                itemBytesTotal = artifact.size,
+                                groupBytesDone = groupDone + done
+                            )
+                        )
+                    } else {
+                        s
+                    }
+                }
+            }
+
+            when (outcome) {
+                is ArtifactDownloader.Outcome.Verified -> {
+                    ledger.markVerified(artifact)
+                    groupDone += artifact.size
+                    _state.update {
+                        it.copy(
+                            fetched = ledger.snapshot(),
+                            progress = it.progress?.copy(
+                                itemBytesDone = artifact.size,
+                                groupBytesDone = groupDone
+                            )
+                        )
+                    }
+                }
+                is ArtifactDownloader.Outcome.HashMismatch -> {
+                    fail(
+                        groupId, artifact.id,
+                        "Checksum mismatch on ${artifact.id} ${artifact.version} — expected " +
+                            "${outcome.expected.take(12)}…, received ${outcome.actual.take(12)}…. " +
+                            "The file was deleted rather than trusted.",
+                        retryable = true
+                    )
+                    return false
+                }
+                is ArtifactDownloader.Outcome.HttpError -> {
+                    fail(
+                        groupId, artifact.id,
+                        "HTTP ${outcome.status} fetching ${artifact.id} ${artifact.version} — ${outcome.message}",
+                        retryable = outcome.status == 429 || outcome.status in 500..599
+                    )
+                    return false
+                }
+                is ArtifactDownloader.Outcome.Failed -> {
+                    fail(
+                        groupId, artifact.id,
+                        "Downloading ${artifact.id} ${artifact.version} — ${outcome.reason}",
+                        retryable = true
+                    )
+                    return false
+                }
+            }
+        }
+        return true
     }
 
     /** Stop the in-flight run. Bytes already fetched stay on disk and resume later. */

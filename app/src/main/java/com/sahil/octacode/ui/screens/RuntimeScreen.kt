@@ -104,6 +104,43 @@ fun RuntimeScreen(
             )
         }
 
+        val totalPending = state.pendingBytes(manifest)
+        val runtimeComplete = state.isComplete(manifest)
+
+        GlassPanel(title = "Default install") {
+            Text(
+                if (runtimeComplete) {
+                    "Full runtime verified — ${manifest.packageCount} artifacts, ${formatBytes(manifest.unionBytes)}"
+                } else {
+                    "${formatBytes(totalPending)} of ${formatBytes(manifest.unionBytes)} remaining · " +
+                        "${state.pendingCount(manifest)} of ${manifest.packageCount} artifacts"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(4.dp))
+            Button(
+                onClick = { provisioner.installAll() },
+                enabled = !state.busy && !runtimeComplete && supportedAbi,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    when {
+                        runtimeComplete -> "Full runtime installed ✓"
+                        state.busy -> "Installing…"
+                        else -> "Install full runtime (${formatBytes(totalPending)})"
+                    }
+                )
+            }
+            Text(
+                "Runs base userland → PRoot → Node → Python → dev tools → Rust in that order, " +
+                    "including the ~219MB toolchain. Stops at the first failure and keeps " +
+                    "everything already verified.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
         if (supportedAbi) {
             manifest.groups.forEach { group ->
                 GroupCard(

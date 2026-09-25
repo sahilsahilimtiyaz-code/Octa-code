@@ -28,6 +28,7 @@ class RuntimeProvisionerTest {
 
     private val alpha = ByteArray(70_000) { (it % 199).toByte() }
     private val beta = ByteArray(40_000) { (it % 173).toByte() }
+    private val gamma = ByteArray(30_000) { (it % 151).toByte() }
 
     private lateinit var manifest: RuntimeManifest
 
@@ -37,9 +38,14 @@ class RuntimeProvisionerTest {
         cache = File(dir, "cache").apply { mkdirs() }
         ledgerFile = File(dir, "ledger.json")
 
-        val items = listOf(
+        val baseItems = listOf(
             artifact("alpha", alpha, "pool/main/a/alpha/alpha_1.0_aarch64.deb"),
             artifact("beta", beta, "pool/main/b/beta/beta_1.0_aarch64.deb")
+        )
+        // "extra" reuses beta, so a full install has to dedupe across closures.
+        val extraItems = listOf(
+            baseItems[1],
+            artifact("gamma", gamma, "pool/main/g/gamma/gamma_1.0_aarch64.deb")
         )
         manifest = RuntimeManifest(
             schema = 1,
@@ -53,14 +59,22 @@ class RuntimeProvisionerTest {
                 RuntimeGroup(
                     id = "base",
                     title = "Base",
-                    description = "test group",
+                    description = "first group",
                     optional = false,
-                    totalBytes = items.sumOf { it.size },
-                    items = items
+                    totalBytes = baseItems.sumOf { it.size },
+                    items = baseItems
+                ),
+                RuntimeGroup(
+                    id = "extra",
+                    title = "Extra",
+                    description = "second group",
+                    optional = false,
+                    totalBytes = extraItems.sumOf { it.size },
+                    items = extraItems
                 )
             ),
-            unionBytes = items.sumOf { it.size },
-            packageCount = items.size
+            unionBytes = listOf(alpha, beta, gamma).sumOf { it.size.toLong() },
+            packageCount = 3
         )
     }
 
@@ -102,7 +116,7 @@ class RuntimeProvisionerTest {
 
     /** The real on-device path for an artifact — derived, never hand-typed. */
     private fun cached(id: String): File =
-        File(cache, manifest.group("base")!!.items.first { it.id == id }.cacheName)
+        File(cache, manifest.distinctArtifacts().first { it.id == id }.cacheName)
 
     private suspend fun RuntimeProvisioner.awaitIdle(): ProvisionerState =
         withTimeout(30_000) { state.first { !it.busy } }
@@ -218,5 +232,64 @@ class RuntimeProvisionerTest {
         assertNull(state.lastError)
         assertEquals("re-verify must not re-download", 2, requests)
         assertEquals(2, state.fetched.size)
+    }
+
+    @Test
+    fun `installAll covers every group and downloads shared artifacts once`() = runBlocking {
+        var requests = 0
+        val prov = newProvisioner(serve { path ->
+            requests++
+            when (fileName(path)) {
+                "alpha_1.0_aarch64.deb" -> Reply.Bytes(alpha)
+                "beta_1.0_aarch64.deb" -> Reply.Bytes(beta)
+                else -> Reply.Bytes(gamma)
+            }
+        })
+
+        val fullCost = (alpha.size + beta.size + gamma.size).toLong()
+        assertEquals(
+            "shared package must be counted once",
+            fullCost,
+            prov.state.value.pendingBytes(manifest)
+        )
+
+        prov.installAll()
+        val final = prov.awaitIdle()
+
+        assertNull("unexpected error: ${final.lastError}", final.lastError)
+        assertEquals("beta is in both groups but fetched once", 3, requests)
+        assertEquals(3, final.fetched.size)
+        assertTrue("whole runtime should be complete", final.isComplete(manifest))
+        assertEquals(0L, final.pendingBytes(manifest))
+        assertTrue(cached("alpha").isFile)
+        assertTrue(cached("beta").isFile)
+        assertTrue(cached("gamma").isFile)
+    }
+
+    @Test
+    fun `installAll stops the whole queue at the first failure`() = runBlocking {
+        val prov = newProvisioner(serve { path ->
+            when (fileName(path)) {
+                "alpha_1.0_aarch64.deb" -> Reply.Bytes(alpha)
+                "beta_1.0_aarch64.deb" -> Reply.Bytes(beta)
+                else -> Reply.Missing // gamma is unreachable
+            }
+        })
+
+        prov.installAll()
+        val final = withTimeout(30_000) {
+            prov.state.first { !it.busy && it.lastError != null }
+        }
+
+        val error = requireNotNull(final.lastError) { "expected the queue to stop" }
+        assertEquals("extra", error.groupId)
+        assertEquals("gamma", error.itemId)
+        assertTrue("reason was: ${error.reason}", error.reason.contains("HTTP 404"))
+        assertEquals(
+            "everything before the failure stays verified",
+            2,
+            final.fetched.size
+        )
+        assertFalse(cached("gamma").exists())
     }
 }

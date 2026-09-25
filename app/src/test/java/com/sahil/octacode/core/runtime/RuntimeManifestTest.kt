@@ -65,10 +65,16 @@ class RuntimeManifestTest {
         assertTrue(manifest.group("python")!!.items.any { it.id == "python" })
         assertTrue(manifest.group("devtools")!!.items.any { it.id == "git" })
 
-        // Optional flag only on the one that is ~200MB.
-        assertTrue(manifest.group("rust")!!.optional)
-        assertEquals(listOf(false, false, false, false, false, true),
-            manifest.groups.map { it.optional })
+        // No group is opt-in: Rust was promoted into the default install set,
+        // so every group is fetched by the full-runtime action.
+        assertEquals(
+            listOf(false, false, false, false, false, false),
+            manifest.groups.map { it.optional }
+        )
+        assertTrue(
+            "union size was ${manifest.unionBytes}",
+            manifest.unionBytes in 260_000_000L..270_000_000L
+        )
     }
 
     @Test

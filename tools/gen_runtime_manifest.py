@@ -57,8 +57,8 @@ GROUPS = [
      "git, ripgrep, fd, fzf, curl",
      ["git", "ripgrep", "fd", "fzf", "curl"], False),
     ("rust", "Rust toolchain",
-     "Optional (~213MB with clang/llvm) — only when a build needs cargo",
-     ["rust"], True),
+     "rustc, cargo, clang/llvm + NDK sysroot — part of the default install",
+     ["rust"], False),
 ]
 
 

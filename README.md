@@ -108,8 +108,9 @@ Native Android AI coding workstation. No legacy, no stubs wired as real.
   `--check` fails if the committed asset is stale.
 - Bundled `assets/runtime-manifest.json` — **78 pinned arm64 artifacts (264MB)** in six
   independent groups: base userland 14.8MB · PRoot 0.1MB · Node 24 23.9MB · Python 3.14 10.0MB
-  · dev tools 23.2MB · **Rust 219MB (optional)**. Install one group = download only what it
-  still needs (closures overlap and are deduped against the ledger).
+  · dev tools 23.2MB · **Rust 219MB**. No group is opt-in: all six are part of the default
+  install, and a group install downloads only what it still needs (closures overlap and are
+  deduped against the ledger, so shared packages are never fetched or charged twice).
 - Manifest ships **inside the APK** — a compromised mirror cannot widen what the app accepts.
 - `ArtifactDownloader` — streams to disk, `Range`-resumes partials, computes SHA-256 over the
   bytes actually written (including a resumed prefix). A mismatch **deletes the file** and
@@ -121,10 +122,13 @@ Native Android AI coding workstation. No legacy, no stubs wired as real.
 - `RuntimeLedger` — atomic (tmp + rename) JSON record of what was proven. An unreadable
   ledger starts **empty** and says so: cached artifacts are then re-verified offline by
   hashing them, so damage costs a re-check, never a re-download and never a free pass.
-- `RuntimeProvisioner` — one group at a time, publishes busy state before the coroutine
+- `RuntimeProvisioner` — `installAll()` runs every group in order (the default install,
+  Rust included); `install(id)` runs one. The plan is re-resolved per group so a package
+  shared by two closures is never fetched twice. Publishes busy state before the coroutine
   starts, stops at the first failure with the real reason, keeps bytes on Stop so the next
   run resumes.
-- **Runtime screen** (Settings → Runtime): pinned-source panel, per-group Install / Stop /
+- **Runtime screen** (Settings → Runtime): a **"Install full runtime (264MB)"** primary
+  action that quotes the honest remaining bytes first, plus per-group Install / Stop /
   Re-verify with real byte progress, honest "n/m verified · X to download", ABI gate that
   refuses to download anything on a non-arm64 device, delete-all.
 - Still honest about the milestone: artifacts are **fetched and verified** here; unpacking
@@ -132,7 +136,8 @@ Native Android AI coding workstation. No legacy, no stubs wired as real.
   available until it actually is.
 - Unit tests: manifest pin validation, downloader (fresh / resume / mismatch / truncated /
   reuse-without-network / retry / 404), ledger (round-trip / corruption / atomicity),
-  provisioner end-to-end (install / idempotent / stop-on-failure / mismatch / offline re-verify).
+  provisioner end-to-end (install / idempotent / stop-on-failure / mismatch / offline
+  re-verify / full install with cross-group dedup / queue stop at first failure).
 
 ## Setup
 1. Copy this folder into your projects directory.
