@@ -31,6 +31,7 @@ import com.sahil.octacode.ui.components.SectionHeaderText
 fun SettingsScreen(
     onOpenAppearance: () -> Unit = {},
     onOpenSessions: () -> Unit = {},
+    onOpenChat: () -> Unit = {},
     onOpenProviders: () -> Unit = {},
     onOpenAutonomy: () -> Unit = {},
     onOpenRuntime: () -> Unit = {},
@@ -53,6 +54,11 @@ fun SettingsScreen(
             title = "Sessions",
             subtitle = "Retention, archiving and stored conversations",
             onClick = onOpenSessions,
+        )
+        SettingsNavRow(
+            title = "Chat",
+            subtitle = "Sending while streaming, tool calls and reasoning",
+            onClick = onOpenChat,
         )
         SettingsNavRow(
             title = "Providers",

@@ -71,9 +71,13 @@ private fun chatEngine(
 /**
  * Captures the request the engine actually builds, so "what goes on the wire"
  * can be asserted rather than inferred from state.
+ *
+ * [streamDelayMs] holds the response open, which is how a test gets the engine
+ * into `busy` without a real network round trip.
  */
 private class RecordingProvider(
-    override val id: ProviderId = ProviderId.OPENAI
+    override val id: ProviderId = ProviderId.OPENAI,
+    private val streamDelayMs: Long = 0L,
 ) : AiProvider {
     val requests = mutableListOf<ChatRequest>()
     override val badge = CapabilityBadge.API
@@ -82,6 +86,7 @@ private class RecordingProvider(
         requests += request
         return flow {
             emit(ChatChunk("ok"))
+            if (streamDelayMs > 0) delay(streamDelayMs)
             emit(ChatChunk("", done = true))
         }
     }
@@ -371,5 +376,106 @@ class ChatEngineTest {
         engine.selectModel(ModelCatalog.byId("gpt-4.1")!!)
         assertTrue(modelState.used.isEmpty())
         assertTrue(modelState.states.value.isEmpty())
+    }
+
+    // --- queue while streaming ------------------------------------------------
+
+    @Test
+    fun `queue mode holds a message typed during a stream instead of refusing it`() = runTest {
+        val provider = RecordingProvider(streamDelayMs = 5_000)
+        val engine = chatEngine(readyRegistry(), mapOf(ProviderId.OPENAI to provider), this)
+        engine.refreshProviderStatus()
+        assertTrue(engine.send("first"))
+        assertTrue(engine.state.value.busy)
+        // The stream runs on the test scheduler, not inline with send(): until
+        // time advances, nothing has reached the provider yet.
+        testScheduler.advanceTimeBy(1)
+        yield()
+
+        assertTrue(engine.send("second", queueIfBusy = true))
+        assertEquals("second", engine.state.value.queuedText)
+
+        // Held, not started: a second request in flight would interleave two
+        // responses into the one turn list on screen.
+        assertEquals(1, provider.requests.size)
+        assertEquals(
+            1,
+            engine.state.value.turns.count { it.author == ChatAuthor.USER }
+        )
+
+        engine.stop()
+        testScheduler.advanceUntilIdle()
+    }
+
+    @Test
+    fun `without queue mode a send during a stream is still refused`() = runTest {
+        val provider = RecordingProvider(streamDelayMs = 5_000)
+        val engine = chatEngine(readyRegistry(), mapOf(ProviderId.OPENAI to provider), this)
+        engine.refreshProviderStatus()
+        assertTrue(engine.send("first"))
+        testScheduler.advanceTimeBy(1)
+        yield()
+
+        assertFalse(engine.send("second"))
+        assertNull(engine.state.value.queuedText)
+        assertEquals(1, provider.requests.size)
+
+        engine.stop()
+        testScheduler.advanceUntilIdle()
+    }
+
+    @Test
+    fun `queued message goes out once the stream finishes`() = runTest {
+        val provider = RecordingProvider(streamDelayMs = 5_000)
+        val engine = chatEngine(readyRegistry(), mapOf(ProviderId.OPENAI to provider), this)
+        engine.refreshProviderStatus()
+        assertTrue(engine.send("first"))
+        testScheduler.advanceTimeBy(1)
+        yield()
+        assertEquals(1, provider.requests.size)
+
+        assertTrue(engine.send("second", queueIfBusy = true))
+        // Queued but not issued — still exactly one request on the wire.
+        assertEquals(1, provider.requests.size)
+
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(2, provider.requests.size)
+        assertNull(engine.state.value.queuedText)
+        assertFalse(engine.state.value.busy)
+        assertEquals(
+            listOf("first", "second"),
+            engine.state.value.turns
+                .filter { it.author == ChatAuthor.USER }
+                .map { it.text }
+        )
+        // The queued text went out as a real turn, not merely as a side effect:
+        // it is on screen in the order it was typed.
+        assertEquals(
+            "second",
+            provider.requests.last().messages.last().content
+        )
+    }
+
+    @Test
+    fun `queue mode does not delay a send when nothing is streaming`() = runTest {
+        val provider = RecordingProvider()
+        val engine = chatEngine(readyRegistry(), mapOf(ProviderId.OPENAI to provider), this)
+        engine.refreshProviderStatus()
+
+        assertTrue(engine.send("first", queueIfBusy = true))
+
+        // Nothing is streaming, so queue mode must not defer anything: the turn
+        // is taken straight away with no queued copy held back.
+        assertNull(engine.state.value.queuedText)
+        assertEquals(
+            listOf("first"),
+            engine.state.value.turns
+                .filter { it.author == ChatAuthor.USER }
+                .map { it.text }
+        )
+
+        testScheduler.advanceUntilIdle()
+        assertEquals(1, provider.requests.size)
     }
 }

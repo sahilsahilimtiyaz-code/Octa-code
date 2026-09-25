@@ -18,6 +18,7 @@ object Routes {
     const val SETTINGS_PROVIDERS = "settings/providers"
     const val SETTINGS_AUTONOMY = "settings/autonomy"
     const val SETTINGS_SESSIONS = "settings/sessions"
+    const val SETTINGS_CHAT = "settings/chat"
 
     const val MISSION_LAUNCH = "mission/launch"
     const val MISSION_DETAIL_PATTERN = "mission/{missionId}"

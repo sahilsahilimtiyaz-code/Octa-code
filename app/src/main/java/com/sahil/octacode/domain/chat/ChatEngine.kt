@@ -52,6 +52,15 @@ data class ChatEngineState(
     val turns: List<ChatTurn> = emptyList(),
     val busy: Boolean = false,
     val streamingText: String? = null,
+    /**
+     * Message accepted while a response was streaming, under
+     * `SendBehavior.QUEUE`. Null when nothing is waiting.
+     *
+     * Deliberately not persisted: it belongs to the conversation on screen,
+     * and a message that was never delivered must not be resurrected from disk
+     * on the next launch as though it had been.
+     */
+    val queuedText: String? = null,
     val lastError: String? = null,
     val selectedProvider: ProviderId = ProviderId.OPENAI,
     /**
@@ -217,13 +226,29 @@ class ChatEngine(
     }
 
     /**
-     * Send one user turn. Returns false when blocked (error in state).
-     * No assistant turn is created unless Ready + adapter exist.
+     * Send one user turn, or hold it when [queueIfBusy] is set and a response
+     * is already streaming.
+     *
+     * Returns false only when the message was *not* taken — blank text, or
+     * busy without queueing. A queued message returns true because it was
+     * accepted, so the caller can clear its draft exactly as it would after an
+     * immediate send.
      */
-    fun send(userText: String): Boolean {
+    fun send(userText: String, queueIfBusy: Boolean = false): Boolean {
         val text = userText.trim()
-        if (text.isEmpty() || _state.value.busy) return false
+        if (text.isEmpty()) return false
+        if (_state.value.busy) {
+            if (!queueIfBusy) return false
+            // Held rather than sent: issuing a second request while one is in
+            // flight would interleave two responses into the same turn list.
+            _state.update { it.copy(queuedText = text) }
+            return true
+        }
+        return dispatch(text)
+    }
 
+    /** The part of [send] that runs once the engine is known to be free. */
+    private fun dispatch(text: String): Boolean {
         val userTurn = ChatTurn(
             id = UUID.randomUUID().toString(),
             author = ChatAuthor.USER,
@@ -373,6 +398,18 @@ class ChatEngine(
         // Store what the reader will actually see — the stopped/failed label,
         // not the raw arguments — so a reopened chat renders identically.
         _state.value.turns.firstOrNull { it.id == assistantId }?.let { persist(it) }
+
+        // Release whatever was held while this response ran. It goes out no
+        // matter how the stream ended: "queue while streaming" promises
+        // delivery, and quietly retaining it after a failure would be a message
+        // that never sends — the kind of silent no-op this app does not ship.
+        // If the flush is refused, dispatch puts the text on screen with the
+        // reason beside it rather than dropping it.
+        val queued = _state.value.queuedText
+        if (queued != null) {
+            _state.update { it.copy(queuedText = null) }
+            dispatch(queued)
+        }
     }
 
     // --- persistence ----------------------------------------------------------

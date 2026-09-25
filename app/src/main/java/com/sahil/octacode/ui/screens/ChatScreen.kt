@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.SmartToy
@@ -32,6 +33,7 @@ import androidx.compose.material.icons.outlined.TrackChanges
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.foundation.text.BasicTextField
@@ -54,6 +56,8 @@ import com.sahil.octacode.core.capability.ProviderStatus
 import com.sahil.octacode.core.model.ModelCatalog
 import com.sahil.octacode.core.provider.AiProvider
 import com.sahil.octacode.core.provider.ProviderId
+import com.sahil.octacode.core.settings.SendBehavior
+import com.sahil.octacode.data.settings.SettingsRepository
 import com.sahil.octacode.domain.chat.ChatEngine
 import com.sahil.octacode.domain.mission.MissionRepository
 import com.sahil.octacode.domain.mission.MissionStatus
@@ -91,9 +95,16 @@ fun ChatScreen(
     modelState: ModelUserStateRepository = koinInject(),
     /** Which endpoints have a registered adapter, so the sheet can say so. */
     adapters: Map<ProviderId, AiProvider> = koinInject(),
+    settingsRepository: SettingsRepository = koinInject(),
 ) {
     val state by engine.state.collectAsState()
     val modelStates by modelState.states.collectAsState()
+    val settings by settingsRepository.settings.collectAsState()
+    /**
+     * Queue mode is what decides whether the composer can be used mid-response
+     * at all — under IMMEDIATELY it stays read-only, as it always has.
+     */
+    val queueMode = settings.sendBehavior == SendBehavior.QUEUE
     var draft by remember { mutableStateOf("") }
     var modelSheet by remember { mutableStateOf(false) }
     // Set when send is tapped while the provider is not ready, so the caption
@@ -456,7 +467,10 @@ fun ChatScreen(
                     modifier = Modifier
                         .weight(1f)
                         .padding(vertical = 8.dp),
-                    enabled = !state.busy,
+                    // Read-only mid-response unless the user chose to queue:
+                    // under IMMEDIATELY a usable composer would invite a send
+                    // the button then refuses without saying so.
+                    enabled = !state.busy || queueMode,
                     textStyle = MaterialTheme.typography.bodyLarge.copy(
                         color = OnDark,
                         fontSize = 15.sp
@@ -477,14 +491,29 @@ fun ChatScreen(
                     }
                 )
                 Spacer(Modifier.width(4.dp))
+                // Under QUEUE the round button keeps meaning "send", so stop
+                // needs a place of its own: one control meaning send half the
+                // time and stop the other half is how a stream gets abandoned
+                // by someone reaching for send.
+                if (state.busy && queueMode) {
+                    IconButton(onClick = { engine.stop() }) {
+                        Icon(
+                            Icons.Filled.Stop,
+                            contentDescription = "Stop response",
+                            tint = OnDarkMuted,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                }
                 NeonSendButton(
-                    enabled = draft.isNotBlank() && ready && !state.busy,
-                    busy = state.busy,
+                    enabled = draft.isNotBlank() && ready && (!state.busy || queueMode),
+                    busy = state.busy && !queueMode,
                     onClick = {
-                        if (state.busy) {
-                            engine.stop()
-                        } else if (engine.send(draft)) {
-                            draft = ""
+                        when {
+                            state.busy && queueMode ->
+                                if (engine.send(draft, queueIfBusy = true)) draft = ""
+                            state.busy -> engine.stop()
+                            else -> if (engine.send(draft)) draft = ""
                         }
                     },
                     onBlocked = { sendBlocked = true }
@@ -497,6 +526,7 @@ fun ChatScreen(
             val reason = status?.reason ?: "No provider is configured"
             Text(
                 text = when {
+                    state.queuedText != null -> "Queued - sends when this response finishes"
                     state.busy -> "Streaming from provider..."
                     ready -> "In-memory session - lost on process death"
                     sendBlocked -> "$reason - tap here to open Providers"

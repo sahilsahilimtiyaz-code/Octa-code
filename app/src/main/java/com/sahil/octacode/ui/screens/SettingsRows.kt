@@ -6,17 +6,25 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -152,6 +160,60 @@ fun SettingSlider(
                 valueRange = valueRange,
                 steps = steps,
             )
+        }
+    }
+}
+
+/**
+ * A choice-valued setting: its name, what it is now, and a picker over the
+ * answers it accepts.
+ *
+ * The option list is a parameter rather than something read from a global, so
+ * the menu shows exactly the values this setting can hold — a picker that
+ * omitted one of its own choices would offer a decision the user cannot
+ * actually make.
+ */
+@Composable
+fun <T : Enum<T>> EnumSettingCard(
+    title: String,
+    current: T,
+    options: List<T>,
+    label: (T) -> String,
+    onPick: (T) -> Unit,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+) {
+    var open by remember { mutableStateOf(false) }
+    Card(modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall)
+            if (subtitle != null) {
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OnDarkMuted,
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Current: ${label(current)}",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(onClick = { open = true }) { Text("Change") }
+            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                options.forEach { option ->
+                    DropdownMenuItem(
+                        text = {
+                            Text(if (option == current) "• ${label(option)}" else label(option))
+                        },
+                        onClick = {
+                            onPick(option)
+                            open = false
+                        },
+                    )
+                }
+            }
         }
     }
 }
