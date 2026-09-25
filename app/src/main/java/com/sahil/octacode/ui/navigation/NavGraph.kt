@@ -23,7 +23,10 @@ import com.sahil.octacode.ui.screens.SplashScreen
 import com.sahil.octacode.ui.screens.TerminalScreen
 
 @Composable
-fun OctaNavGraph(navController: NavHostController) {
+fun OctaNavGraph(
+    navController: NavHostController,
+    onOpenDrawer: () -> Unit = {},
+) {
     NavHost(navController = navController, startDestination = Routes.SPLASH) {
         composable(Routes.SPLASH) {
             SplashScreen(onDone = {
@@ -41,7 +44,11 @@ fun OctaNavGraph(navController: NavHostController) {
         }
         composable(Routes.CHAT) {
             ChatScreen(
-                onOpenMenu = { navController.navigate(Routes.SETTINGS) },
+                // The hamburger's real job is the drawer, not Settings —
+                // Settings stays reachable from the profile button and from
+                // a row inside the drawer, so nothing is lost by fixing what
+                // the menu icon promises.
+                onOpenMenu = onOpenDrawer,
                 onOpenProfile = { navController.navigate(Routes.SETTINGS) },
                 onOpenProjects = { navController.navigate(Routes.PROJECTS) }
             )

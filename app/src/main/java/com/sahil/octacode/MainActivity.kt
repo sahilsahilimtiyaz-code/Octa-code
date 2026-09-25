@@ -21,13 +21,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Terminal
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,6 +42,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.sahil.octacode.domain.chat.ChatEngine
+import com.sahil.octacode.ui.components.OctaDrawer
 import com.sahil.octacode.ui.components.StarFieldBackground
 import com.sahil.octacode.ui.demo.LocalDemoPreview
 import com.sahil.octacode.ui.demo.rememberDemoPreviewState
@@ -50,8 +56,10 @@ import com.sahil.octacode.ui.theme.NeonBlueBright
 import com.sahil.octacode.ui.theme.OctaCodeTheme
 import com.sahil.octacode.ui.theme.OnDark
 import com.sahil.octacode.ui.theme.OnDarkMuted
+import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
 
-/** Reference bottom bar: Workspace / Code / Terminal (Settings via header menu). */
+/** Reference bottom bar: Workspace / Code / Terminal. The header menu opens the side drawer. */
 private data class BottomDest(val route: String, val label: String, val icon: ImageVector)
 
 private val BOTTOM_DESTS = listOf(
@@ -91,32 +99,83 @@ private fun OctaScaffold() {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
-    Scaffold(
-        containerColor = Color.Transparent,
-        bottomBar = {
-            if (currentRoute != Routes.SPLASH && !Routes.isMissionRoute(currentRoute)) {
-                AgentBottomBar(
-                    currentRoute = currentRoute,
-                    onSelect = { route ->
-                        navController.navigate(route) {
-                            popUpTo(Routes.HOME) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+    val engine: ChatEngine = koinInject()
+
+    // Shared by the bottom bar and the drawer so both navigate identically —
+    // one helper, one stack behaviour, no duplicate entries from the two
+    // entry points disagreeing about what a tap means.
+    fun goTo(route: String) {
+        navController.navigate(route) {
+            popUpTo(Routes.HOME) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        // The drawer appears and disappears with the bottom bar. Both are
+        // hidden on splash and mission routes, so leaving edge-swipes on
+        // everywhere would give those screens a piece of navigation the rest
+        // of the chrome says does not exist here.
+        gesturesEnabled = currentRoute != Routes.SPLASH &&
+            !Routes.isMissionRoute(currentRoute),
+        drawerContent = {
+            OctaDrawer(
+                onOpenSession = { id ->
+                    scope.launch {
+                        // Close first, or the drawer would sit over the
+                        // conversation it just loaded. Failure is not
+                        // swallowed: openSession sets lastError, and Chat
+                        // renders it, so a deleted conversation says so on
+                        // screen instead of quietly changing nothing.
+                        drawerState.close()
+                        engine.openSession(id)
+                        goTo(Routes.CHAT)
                     }
+                },
+                onOpenProjects = {
+                    scope.launch { drawerState.close() }
+                    goTo(Routes.PROJECTS)
+                },
+                onOpenSettings = {
+                    scope.launch { drawerState.close() }
+                    goTo(Routes.SETTINGS)
+                },
+                onOpenManageChats = {
+                    scope.launch { drawerState.close() }
+                    goTo(Routes.SETTINGS_SESSIONS)
+                },
+            )
+        },
+    ) {
+        Scaffold(
+            containerColor = Color.Transparent,
+            bottomBar = {
+                if (currentRoute != Routes.SPLASH && !Routes.isMissionRoute(currentRoute)) {
+                    AgentBottomBar(
+                        currentRoute = currentRoute,
+                        onSelect = { route -> goTo(route) }
+                    )
+                }
+            }
+        ) { innerPadding ->
+            Box(modifier = Modifier.padding(innerPadding)) {
+                OctaNavGraph(
+                    navController = navController,
+                    onOpenDrawer = { scope.launch { drawerState.open() } },
                 )
             }
-        }
-    ) { innerPadding ->
-        Box(modifier = Modifier.padding(innerPadding)) {
-            OctaNavGraph(navController = navController)
         }
     }
 }
 
 /**
- * Glass bottom bar with gold active pill on the icon + label underline — reference mock.
- * Chat (Agent) highlights Workspace, matching the mock while Chat is open.
+ * Glass bottom bar with a flat cyan active pill on the icon + label underline
+ * — reference mock. Chat (Agent) highlights Workspace, matching the mock while
+ * Chat is open.
  */
 @Composable
 private fun AgentBottomBar(
