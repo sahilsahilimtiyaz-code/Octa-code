@@ -83,6 +83,7 @@ fun SettingsScreen(
             id = ProviderId.OPENAI,
             badge = CapabilityBadge.API,
             status = statuses[ProviderId.OPENAI],
+            savedKey = credentials.getApiKey(ProviderId.OPENAI),
             onSaveKey = { credentials.setApiKey(ProviderId.OPENAI, it); refresh() },
             onClearKey = { credentials.clearApiKey(ProviderId.OPENAI); refresh() }
         )
@@ -121,6 +122,7 @@ private fun ApiKeyCard(
     id: ProviderId,
     badge: CapabilityBadge,
     status: ProviderStatus?,
+    savedKey: String?,
     onSaveKey: (String) -> Unit,
     onClearKey: () -> Unit
 ) {
@@ -133,10 +135,19 @@ private fun ApiKeyCard(
                 CapabilityBadgeChip(badge)
             }
             Text(statusText(status), style = MaterialTheme.typography.bodySmall)
+            // Show enough of the stored key to recognise which one it is: an
+            // OpenRouter key pasted into this box looks identical to an OpenAI
+            // key until the request has already been rejected.
+            if (!savedKey.isNullOrBlank()) {
+                Text(
+                    "Saved · starts with ${savedKey.take(8)}…",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
             OutlinedTextField(
                 value = input,
                 onValueChange = { input = it },
-                label = { Text("API key") },
+                label = { Text(if (savedKey.isNullOrBlank()) "API key" else "Replace API key") },
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
@@ -157,9 +168,14 @@ private fun CustomEndpointCard(
     status: ProviderStatus?,
     onChanged: () -> Unit
 ) {
-    var url by remember { mutableStateOf("") }
-    var model by remember { mutableStateOf("") }
+    // Open with whatever is already stored. A form that always starts blank
+    // hides the one thing the user came here to check — which model is set.
+    var url by remember { mutableStateOf(credentials.getCustomBaseUrl() ?: "") }
+    var model by remember {
+        mutableStateOf(credentials.getCustomModel().takeIf { it != "default" } ?: "")
+    }
     var key by remember { mutableStateOf("") }
+    val keySaved = credentials.hasApiKey(ProviderId.CUSTOM)
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -171,16 +187,19 @@ private fun CustomEndpointCard(
             OutlinedTextField(
                 value = url, onValueChange = { url = it },
                 label = { Text("Base URL (https://…)") },
+                placeholder = { Text("https://openrouter.ai/api/v1") },
                 modifier = Modifier.fillMaxWidth(), singleLine = true
             )
             OutlinedTextField(
                 value = model, onValueChange = { model = it },
                 label = { Text("Model") },
+                placeholder = { Text("openai/gpt-4o-mini") },
+                supportingText = { Text("OpenRouter uses vendor/model ids. A blank model is rejected by the server.") },
                 modifier = Modifier.fillMaxWidth(), singleLine = true
             )
             OutlinedTextField(
                 value = key, onValueChange = { key = it },
-                label = { Text("API key (optional)") },
+                label = { Text(if (keySaved) "API key (saved — type to replace)" else "API key (optional)") },
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(), singleLine = true
             )
@@ -188,7 +207,9 @@ private fun CustomEndpointCard(
                 if (url.isNotBlank()) credentials.setCustomBaseUrl(url)
                 if (model.isNotBlank()) credentials.setCustomModel(model)
                 if (key.isNotBlank()) credentials.setApiKey(ProviderId.CUSTOM, key)
-                url = ""; model = ""; key = ""
+                // Only the secret is wiped; url and model stay on screen so the
+                // user can see what they configured instead of guessing.
+                key = ""
                 onChanged()
             }) { Text("Save endpoint") }
         }

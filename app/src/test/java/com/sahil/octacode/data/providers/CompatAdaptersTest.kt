@@ -1,0 +1,99 @@
+package com.sahil.octacode.data.providers
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/**
+ * Guards the two things that made failed requests undebuggable: the provider's
+ * explanation was thrown away, and a key from the wrong provider passed
+ * validation. Both are pure functions, so both are pinned here.
+ */
+class CompatAdaptersTest {
+
+    @Test
+    fun `openai body keeps the sentence that explains the 401`() {
+        val body = """{"error":{"message":"Incorrect API key provided: sk-or-v1-abc123.
+            You can find your API key at https://platform.openai.com/account/api-keys.",
+            "type":"invalid_request_error","param":null,"code":"invalid_api_key"}}"""
+
+        val message = describeHttpError(401, "https://api.openai.com/v1", body)
+
+        assertTrue(message.startsWith("HTTP 401 from https://api.openai.com/v1"))
+        assertTrue(message.contains("Incorrect API key provided"))
+        // Multi-line explanations are collapsed so the chat bubble stays one line.
+        assertFalse(message.contains('\n'))
+    }
+
+    @Test
+    fun `openrouter model error is surfaced rather than a bare status`() {
+        val body = """{"error":{"message":"model is required","code":400}}"""
+
+        assertEquals(
+            "HTTP 400 from https://openrouter.ai/api/v1: model is required",
+            describeHttpError(400, "https://openrouter.ai/api/v1", body)
+        )
+    }
+
+    @Test
+    fun `bare status is reported when the body says nothing useful`() {
+        assertEquals(
+            "HTTP 500 from https://api.openai.com/v1",
+            describeHttpError(500, "https://api.openai.com/v1", "   ")
+        )
+    }
+
+    @Test
+    fun `html error pages are not passed off as the reason`() {
+        assertNull(providerMessage("<html><body>502 Bad Gateway</body></html>"))
+    }
+
+    @Test
+    fun `nested and top level message fields both decode`() {
+        assertEquals(
+            "model is required",
+            providerMessage("""{"error":{"message":"model is required"}}""")
+        )
+        assertEquals(
+            "model is required",
+            providerMessage("""{"message":"model is required"}""")
+        )
+    }
+
+    @Test
+    fun `escaped characters in the provider message are unescaped`() {
+        assertEquals(
+            "line one\nline two\ttabbed é and A",
+            providerMessage("""{"error":{"message":"line one\nline two\ttabbed é and A"}}""")
+        )
+    }
+
+    @Test
+    fun `a key from another provider is caught before the request`() {
+        assertEquals(
+            "This is an OpenRouter key — paste it into Custom endpoint instead of OpenAI",
+            foreignProviderHint("sk-or-v1-abcdef123456")
+        )
+        assertTrue(foreignProviderHint("sk-ant-api03-xyz")!!.contains("Anthropic"))
+        assertTrue(foreignProviderHint("AIzaSyExample")!!.contains("Gemini"))
+    }
+
+    @Test
+    fun `genuine openai key prefixes are left alone`() {
+        assertNull(foreignProviderHint("sk-proj-abcdef123456"))
+        assertNull(foreignProviderHint("sk-svcacct-abcdef123456"))
+        assertNull(foreignProviderHint("sk-abcdef123456"))
+    }
+
+    @Test
+    fun `the default placeholder is never put on the wire`() {
+        assertNull(resolveCustomModel("default", "default"))
+        assertNull(resolveCustomModel("", "  "))
+        assertNull(resolveCustomModel("default", ""))
+        assertEquals("openai/gpt-4o-mini", resolveCustomModel("default", "openai/gpt-4o-mini"))
+        assertEquals("deepseek/deepseek-chat", resolveCustomModel("deepseek/deepseek-chat", "ignored"))
+    }
+
+    private fun assertFalse(value: Boolean) = assertTrue(!value)
+}
