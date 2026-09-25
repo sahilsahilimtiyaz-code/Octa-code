@@ -38,6 +38,7 @@ import com.sahil.octacode.ui.theme.OnDark
 import com.sahil.octacode.ui.theme.OnDarkMuted
 import com.sahil.octacode.ui.theme.SurfaceVariantDark
 import com.sahil.octacode.ui.theme.WarningAmber
+import com.sahil.octacode.ui.theme.codeTextStyle
 
 // M3d UI kit: vertical 16-phase rail with honest status colors + RUNNING pulse.
 @Composable
@@ -121,7 +122,7 @@ private fun PhaseRailRow(
         Spacer(Modifier.width(10.dp))
         Text(
             text = "%02d".format(phase.index),
-            style = MaterialTheme.typography.labelSmall,
+            style = codeTextStyle(MaterialTheme.typography.labelSmall),
             fontFamily = FontFamily.Monospace,
             color = OnDarkMuted
         )
@@ -134,7 +135,7 @@ private fun PhaseRailRow(
         )
         Text(
             text = status?.name ?: if (isCurrent) "…" else "",
-            style = MaterialTheme.typography.labelSmall,
+            style = codeTextStyle(MaterialTheme.typography.labelSmall),
             fontFamily = FontFamily.Monospace,
             color = titleColor
         )

@@ -12,6 +12,9 @@ import com.sahil.octacode.ui.screens.MissionDetailScreen
 import com.sahil.octacode.ui.screens.MissionLaunchScreen
 import com.sahil.octacode.ui.screens.ProjectsScreen
 import com.sahil.octacode.ui.screens.RuntimeScreen
+import com.sahil.octacode.ui.screens.SettingsAppearanceScreen
+import com.sahil.octacode.ui.screens.SettingsAutonomyScreen
+import com.sahil.octacode.ui.screens.SettingsProvidersScreen
 import com.sahil.octacode.ui.screens.SettingsScreen
 import com.sahil.octacode.ui.screens.SplashScreen
 import com.sahil.octacode.ui.screens.TerminalScreen
@@ -43,7 +46,21 @@ fun OctaNavGraph(navController: NavHostController) {
         composable(Routes.PROJECTS) { ProjectsScreen() }
         composable(Routes.TERMINAL) { TerminalScreen() }
         composable(Routes.SETTINGS) {
-            SettingsScreen(onOpenRuntime = { navController.navigate(Routes.RUNTIME) })
+            SettingsScreen(
+                onOpenAppearance = { navController.navigate(Routes.SETTINGS_APPEARANCE) },
+                onOpenProviders = { navController.navigate(Routes.SETTINGS_PROVIDERS) },
+                onOpenAutonomy = { navController.navigate(Routes.SETTINGS_AUTONOMY) },
+                onOpenRuntime = { navController.navigate(Routes.RUNTIME) },
+            )
+        }
+        composable(Routes.SETTINGS_APPEARANCE) {
+            SettingsAppearanceScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Routes.SETTINGS_PROVIDERS) {
+            SettingsProvidersScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Routes.SETTINGS_AUTONOMY) {
+            SettingsAutonomyScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.RUNTIME) {
             RuntimeScreen(onBack = { navController.popBackStack() })

@@ -11,6 +11,13 @@ object Routes {
     const val SETTINGS = "settings"
     const val RUNTIME = "runtime"
 
+    // Settings sub-pages. Each one exists because a hub row points at it —
+    // a route is only added together with the screen it opens, so the hub
+    // can never offer a destination that is not there yet.
+    const val SETTINGS_APPEARANCE = "settings/appearance"
+    const val SETTINGS_PROVIDERS = "settings/providers"
+    const val SETTINGS_AUTONOMY = "settings/autonomy"
+
     const val MISSION_LAUNCH = "mission/launch"
     const val MISSION_DETAIL_PATTERN = "mission/{missionId}"
     const val ARG_MISSION_ID = "missionId"

@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import com.sahil.octacode.ui.theme.NeonGreen
 import com.sahil.octacode.ui.theme.OnDarkMuted
 import com.sahil.octacode.ui.theme.SurfaceDark
+import com.sahil.octacode.ui.theme.codeTextStyle
 
 // M3d UI kit: monospace event / stream terminal with auto-scroll + copy.
 @Composable
@@ -46,7 +47,7 @@ fun StreamTerminal(
         ) {
             Text(
                 text = "STREAM",
-                style = MaterialTheme.typography.labelSmall,
+                style = codeTextStyle(MaterialTheme.typography.labelSmall),
                 fontFamily = FontFamily.Monospace,
                 color = OnDarkMuted,
                 modifier = Modifier
@@ -60,7 +61,7 @@ fun StreamTerminal(
                 ) {
                     Text(
                         text = "Copy",
-                        style = MaterialTheme.typography.labelSmall,
+                        style = codeTextStyle(MaterialTheme.typography.labelSmall),
                         fontFamily = FontFamily.Monospace,
                         color = NeonGreen
                     )
@@ -80,7 +81,7 @@ fun StreamTerminal(
                 item {
                     Text(
                         text = emptyHint,
-                        style = MaterialTheme.typography.bodySmall,
+                        style = codeTextStyle(MaterialTheme.typography.bodySmall),
                         fontFamily = FontFamily.Monospace,
                         color = OnDarkMuted
                     )
@@ -89,7 +90,7 @@ fun StreamTerminal(
                 items(lines) { line ->
                     Text(
                         text = line,
-                        style = MaterialTheme.typography.bodySmall,
+                        style = codeTextStyle(MaterialTheme.typography.bodySmall),
                         fontFamily = FontFamily.Monospace,
                         color = NeonGreen,
                         modifier = Modifier.padding(vertical = 1.dp)

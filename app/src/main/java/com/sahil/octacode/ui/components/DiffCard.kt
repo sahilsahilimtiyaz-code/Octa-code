@@ -27,6 +27,7 @@ import com.sahil.octacode.ui.theme.NeonRed
 import com.sahil.octacode.ui.theme.OnDarkMuted
 import com.sahil.octacode.ui.theme.SurfaceVariantDark
 import com.sahil.octacode.ui.theme.WarningAmber
+import com.sahil.octacode.ui.theme.codeTextStyle
 
 // M3d UI kit: review card for a mission file diff (patch truncated for mobile).
 @Composable
@@ -57,7 +58,7 @@ fun DiffCard(
                 )
                 Text(
                     text = diff.decision.name,
-                    style = MaterialTheme.typography.labelMedium,
+                    style = codeTextStyle(MaterialTheme.typography.labelMedium),
                     fontFamily = FontFamily.Monospace,
                     color = decisionColor
                 )
@@ -70,7 +71,7 @@ fun DiffCard(
             )
             Text(
                 text = "before=${diff.beforeHash.take(12)}  after=${diff.afterHash.take(12)}",
-                style = MaterialTheme.typography.labelSmall,
+                style = codeTextStyle(MaterialTheme.typography.labelSmall),
                 fontFamily = FontFamily.Monospace,
                 color = OnDarkMuted
             )
@@ -78,7 +79,7 @@ fun DiffCard(
             val patchPreview = rememberPatchPreview(diff.patchText)
             Text(
                 text = patchPreview,
-                style = MaterialTheme.typography.bodySmall,
+                style = codeTextStyle(MaterialTheme.typography.bodySmall),
                 fontFamily = FontFamily.Monospace,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier
