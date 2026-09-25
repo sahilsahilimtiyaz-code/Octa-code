@@ -12,7 +12,10 @@ val chatModule = module {
         ChatEngine(
             registry = get(),
             providers = get(),
-            repository = get()
+            repository = get(),
+            // Records a model as used only once a request is actually issued,
+            // which is the one moment the engine knows about.
+            modelState = get()
         )
     }
 }

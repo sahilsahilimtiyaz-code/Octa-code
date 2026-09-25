@@ -2,6 +2,8 @@ package com.sahil.octacode.domain.chat
 
 import com.sahil.octacode.core.capability.CapabilityRegistry
 import com.sahil.octacode.core.capability.ProviderStatus
+import com.sahil.octacode.core.model.ModelCatalog
+import com.sahil.octacode.core.model.ModelDef
 import com.sahil.octacode.core.provider.AiProvider
 import com.sahil.octacode.core.provider.ChatMessage
 import com.sahil.octacode.core.provider.ChatRequest
@@ -10,6 +12,7 @@ import com.sahil.octacode.core.provider.ProviderId
 import com.sahil.octacode.core.provider.defaultModelFor
 import com.sahil.octacode.core.profile.DefaultChain
 import com.sahil.octacode.data.providers.ProviderHttpException
+import com.sahil.octacode.domain.model.ModelUserStateRepository
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -51,6 +54,16 @@ data class ChatEngineState(
     val streamingText: String? = null,
     val lastError: String? = null,
     val selectedProvider: ProviderId = ProviderId.OPENAI,
+    /**
+     * Catalog entry to send with, or null to use the default for
+     * [selectedProvider].
+     *
+     * Held as an id rather than a whole `ModelDef` because an id is all that
+     * goes on the wire — and resolving it against `ModelCatalog` at send time
+     * is what stops a model being sent through an adapter that does not
+     * serve it.
+     */
+    val selectedModelId: String? = null,
     val providerStatus: ProviderStatus? = null,
     /**
      * Session backing the current conversation, or null when history is not
@@ -75,6 +88,13 @@ class ChatEngine(
      * production, which always receives the Room-backed implementation.
      */
     private val repository: ChatRepository? = null,
+    /**
+     * Where "this model was actually used" gets recorded. Null means no store
+     * wired — tests' setup; production receives the preferences-backed one.
+     * Optional only so it can default: a request without it still sends, it
+     * just does not appear in Recent.
+     */
+    private val modelState: ModelUserStateRepository? = null,
     private val clock: () -> Long = { System.currentTimeMillis() },
     scope: CoroutineScope? = null
 ) {
@@ -112,7 +132,62 @@ class ChatEngine(
 
     fun selectProvider(id: ProviderId) {
         if (_state.value.busy) return
-        _state.update { it.copy(selectedProvider = id, providerStatus = null, lastError = null) }
+        // A picked model belongs to exactly one adapter. Moving providers
+        // drops any selection that does not belong here, rather than leaving
+        // it to be resolved against a transport that does not serve it.
+        val selected = _state.value.selectedModelId
+        val stillApplies = selected != null && ModelCatalog.byId(selected)?.adapter == id
+        _state.update {
+            it.copy(
+                selectedProvider = id,
+                selectedModelId = if (stillApplies) selected else null,
+                providerStatus = null,
+                lastError = null,
+            )
+        }
+    }
+
+    /**
+     * Switches to [model].
+     *
+     * The probe is dropped unconditionally, exactly as [selectProvider] does:
+     * `Ready` was established for one provider and this call may be moving to
+     * another, so carrying it across would let a request through on a green
+     * light that was taken somewhere else. The chat screen re-probes
+     * immediately after a pick, so the user does not see the gap.
+     *
+     * Refuses anything not in [ModelCatalog]. Everything downstream resolves
+     * the id back against the catalog, so accepting a row from anywhere else
+     * would show a selection that can never reach the wire — the decorative
+     * control this project does not ship.
+     */
+    fun selectModel(model: ModelDef) {
+        if (_state.value.busy) return
+        if (ModelCatalog.byId(model.id) != model) return
+        _state.update {
+            it.copy(
+                selectedModelId = model.id,
+                selectedProvider = model.adapter,
+                providerStatus = null,
+                lastError = null,
+            )
+        }
+    }
+
+    /**
+     * The id that goes on the wire: the catalog row the user picked, while it
+     * still belongs to [providerId]; otherwise [modelFor]'s default.
+     *
+     * The custom endpoint deliberately has no catalog row — what its server
+     * accepts is whatever the user configured — so it falls through to
+     * [modelFor] here and picks the stored model up downstream, which is what
+     * keeps that already-working path working.
+     */
+    private fun modelOnWire(providerId: ProviderId): String {
+        val picked = _state.value.selectedModelId
+            ?.let { ModelCatalog.byId(it) }
+            ?.takeIf { it.adapter == providerId }
+        return picked?.id ?: modelFor(providerId)
     }
 
     fun clearError() {
@@ -136,6 +211,7 @@ class ChatEngine(
         // see.
         _state.value = ChatEngineState(
             selectedProvider = _state.value.selectedProvider,
+            selectedModelId = _state.value.selectedModelId,
             providerStatus = _state.value.providerStatus,
         )
     }
@@ -188,7 +264,8 @@ class ChatEngine(
             val role = if (turn.author == ChatAuthor.USER) ChatRole.USER else ChatRole.ASSISTANT
             ChatMessage(role, turn.text)
         }
-        val request = ChatRequest(messages = history, model = modelFor(providerId))
+        val modelId = modelOnWire(providerId)
+        val request = ChatRequest(messages = history, model = modelId)
 
         // Hoisted out of the update lambda: MutableStateFlow.update may retry
         // that lambda, and stamping inside it would burn a stamp per attempt.
@@ -216,7 +293,14 @@ class ChatEngine(
                 // Persisted before the stream so the user's message cannot be
                 // lost to a network failure that arrives first.
                 persist(userTurn)
-                provider.chatStream(request).collect { chunk ->
+                val chunks = provider.chatStream(request)
+                // Recorded here rather than when a model is picked in the
+                // picker: both guards above passed and the adapter has taken
+                // the request, so this is the model being used. Tapping
+                // through a list to see what is in it must not fill Recent
+                // with entries that never carried a token.
+                modelState?.markUsed(modelId, clock())
+                chunks.collect { chunk ->
                     if (chunk.delta.isNotEmpty()) {
                         buffer.append(chunk.delta)
                         val partial = buffer.toString()
@@ -330,7 +414,7 @@ class ChatEngine(
     private suspend fun createSessionLocked(repo: ChatRepository, hint: ChatTurn): String {
         _state.value.sessionId?.let { return it }
         val created = repo.createSession(
-            profile = DefaultChain.of(modelFor(_state.value.selectedProvider)),
+            profile = DefaultChain.of(modelOnWire(_state.value.selectedProvider)),
             title = titleFor(hint),
             now = hint.createdAt.takeIf { it > 0 } ?: nextStamp(),
         )

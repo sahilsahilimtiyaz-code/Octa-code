@@ -3,11 +3,16 @@ package com.sahil.octacode.domain.chat
 import com.sahil.octacode.core.capability.AutonomyLevel
 import com.sahil.octacode.core.capability.CapabilityRegistry
 import com.sahil.octacode.core.capability.ProviderStatus
+import com.sahil.octacode.core.model.ModelCatalog
+import com.sahil.octacode.core.model.ModelDef
+import com.sahil.octacode.core.model.ModelUserState
 import com.sahil.octacode.core.provider.AiProvider
 import com.sahil.octacode.core.provider.CapabilityBadge
 import com.sahil.octacode.core.provider.ChatChunk
 import com.sahil.octacode.core.provider.ChatRequest
 import com.sahil.octacode.core.provider.ProviderId
+import com.sahil.octacode.core.provider.defaultModelFor
+import com.sahil.octacode.domain.model.ModelUserStateRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -19,6 +24,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -51,8 +57,54 @@ private fun missingKeyRegistry() = FakeRegistry(ProviderStatus.MissingKey("API k
 private fun chatEngine(
     registry: CapabilityRegistry,
     providers: Map<ProviderId, AiProvider>,
-    scope: CoroutineScope
-): ChatEngine = ChatEngine(registry = registry, providers = providers, scope = scope)
+    scope: CoroutineScope,
+    modelState: ModelUserStateRepository? = null,
+    clock: () -> Long = { System.currentTimeMillis() }
+): ChatEngine = ChatEngine(
+    registry = registry,
+    providers = providers,
+    modelState = modelState,
+    clock = clock,
+    scope = scope
+)
+
+/**
+ * Captures the request the engine actually builds, so "what goes on the wire"
+ * can be asserted rather than inferred from state.
+ */
+private class RecordingProvider(
+    override val id: ProviderId = ProviderId.OPENAI
+) : AiProvider {
+    val requests = mutableListOf<ChatRequest>()
+    override val badge = CapabilityBadge.API
+    override suspend fun validate(): ProviderStatus = ProviderStatus.Ready("recording")
+    override fun chatStream(request: ChatRequest): Flow<ChatChunk> {
+        requests += request
+        return flow {
+            emit(ChatChunk("ok"))
+            emit(ChatChunk("", done = true))
+        }
+    }
+}
+
+private class FakeModelUserStateRepository : ModelUserStateRepository {
+    private val _states = MutableStateFlow<Map<String, ModelUserState>>(emptyMap())
+    override val states: StateFlow<Map<String, ModelUserState>> = _states
+
+    /** Every (model, at) pair that was marked used, in order. */
+    val used = mutableListOf<Pair<String, Long>>()
+
+    override fun setFavorite(modelId: String, favorite: Boolean) {
+        val current = _states.value[modelId] ?: ModelUserState(modelId = modelId)
+        _states.value = _states.value + (modelId to current.copy(isFavorite = favorite))
+    }
+
+    override fun markUsed(modelId: String, at: Long) {
+        val current = _states.value[modelId] ?: ModelUserState(modelId = modelId)
+        _states.value = _states.value + (modelId to current.copy(lastUsedAt = at))
+        used += modelId to at
+    }
+}
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatEngineTest {
@@ -217,5 +269,107 @@ class ChatEngineTest {
         engine.clearConversation()
         assertTrue(engine.state.value.turns.isEmpty())
         assertEquals(ProviderId.OPENAI, engine.state.value.selectedProvider)
+    }
+
+    // --- model selection ----------------------------------------------------
+
+    @Test
+    fun `with nothing picked the provider default goes on the wire`() = runTest {
+        val provider = RecordingProvider()
+        val engine = chatEngine(readyRegistry(), mapOf(ProviderId.OPENAI to provider), this)
+        engine.refreshProviderStatus()
+        assertTrue(engine.send("hi"))
+        testScheduler.advanceUntilIdle()
+        assertEquals(defaultModelFor(ProviderId.OPENAI), provider.requests.single().model)
+    }
+
+    @Test
+    fun `picking a model puts that model on the wire`() = runTest {
+        val provider = RecordingProvider()
+        val engine = chatEngine(readyRegistry(), mapOf(ProviderId.OPENAI to provider), this)
+        engine.selectModel(ModelCatalog.byId("gpt-4.1")!!)
+        // The pick re-probes, as the chat screen does after every selection.
+        engine.refreshProviderStatus()
+        assertTrue(engine.send("hi"))
+        testScheduler.advanceUntilIdle()
+        assertEquals("gpt-4.1", provider.requests.single().model)
+    }
+
+    @Test
+    fun `picking a model drops the probe so a stale green light is not reused`() = runTest {
+        val engine = chatEngine(readyRegistry(), emptyMap(), this)
+        engine.refreshProviderStatus()
+        assertNotNull(engine.state.value.providerStatus)
+        engine.selectModel(ModelCatalog.byId("gpt-4.1")!!)
+        assertEquals(ProviderId.OPENAI, engine.state.value.selectedProvider)
+        assertNull(engine.state.value.providerStatus)
+    }
+
+    @Test
+    fun `a model outside the catalog is refused`() = runTest {
+        val engine = chatEngine(readyRegistry(), emptyMap(), this)
+        engine.refreshProviderStatus()
+        engine.selectModel(
+            ModelDef(
+                id = "not-in-the-catalog",
+                displayName = "Impostor",
+                provider = "Nowhere",
+                adapter = ProviderId.CUSTOM
+            )
+        )
+        assertNull(engine.state.value.selectedModelId)
+        assertNotNull(engine.state.value.providerStatus)
+    }
+
+    @Test
+    fun `switching provider drops a model that does not belong there`() = runTest {
+        val engine = chatEngine(readyRegistry(), emptyMap(), this)
+        engine.selectModel(ModelCatalog.byId("gpt-4.1")!!)
+        engine.selectProvider(ProviderId.CUSTOM)
+        assertNull(engine.state.value.selectedModelId)
+    }
+
+    @Test
+    fun `switching provider keeps a model that does belong there`() = runTest {
+        val engine = chatEngine(readyRegistry(), emptyMap(), this)
+        engine.selectModel(ModelCatalog.byId("gpt-4.1")!!)
+        engine.selectProvider(ProviderId.OPENAI)
+        assertEquals("gpt-4.1", engine.state.value.selectedModelId)
+    }
+
+    @Test
+    fun `clear conversation keeps the picked model`() = runTest {
+        val engine = chatEngine(readyRegistry(), emptyMap(), this)
+        engine.selectModel(ModelCatalog.byId("gpt-4.1")!!)
+        engine.clearConversation()
+        assertEquals("gpt-4.1", engine.state.value.selectedModelId)
+        assertEquals(ProviderId.OPENAI, engine.state.value.selectedProvider)
+    }
+
+    @Test
+    fun `sending records the model as used`() = runTest {
+        val modelState = FakeModelUserStateRepository()
+        val provider = RecordingProvider()
+        val engine = chatEngine(
+            registry = readyRegistry(),
+            providers = mapOf(ProviderId.OPENAI to provider),
+            scope = this,
+            modelState = modelState,
+            clock = { 1_700_000_000_000L }
+        )
+        engine.selectModel(ModelCatalog.byId("gpt-4.1")!!)
+        engine.refreshProviderStatus()
+        assertTrue(engine.send("hi"))
+        testScheduler.advanceUntilIdle()
+        assertEquals(listOf("gpt-4.1" to 1_700_000_000_000L), modelState.used)
+    }
+
+    @Test
+    fun `picking a model does not record it as used`() = runTest {
+        val modelState = FakeModelUserStateRepository()
+        val engine = chatEngine(readyRegistry(), emptyMap(), this, modelState = modelState)
+        engine.selectModel(ModelCatalog.byId("gpt-4.1")!!)
+        assertTrue(modelState.used.isEmpty())
+        assertTrue(modelState.states.value.isEmpty())
     }
 }

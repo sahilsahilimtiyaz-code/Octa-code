@@ -13,6 +13,7 @@ import com.sahil.octacode.data.model.ModelUserStateStore
 import com.sahil.octacode.data.settings.SettingsRepository
 import com.sahil.octacode.domain.chat.ChatRepository
 import com.sahil.octacode.domain.chat.RetentionReport
+import com.sahil.octacode.domain.model.ModelUserStateRepository
 import com.sahil.octacode.domain.mission.MissionRepository
 import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
@@ -40,8 +41,10 @@ val dataModule = module {
     single<SettingsRepository> { SettingsRepository(androidContext()) }
 
     // Favorites and recents for the model selector. Beside settings because it
-    // is the same kind of thing: preferences, read as a flow, not secrets.
-    single { ModelUserStateStore(androidContext()) }
+    // is the same kind of thing: preferences, read as a flow, not secrets —
+    // bound to the interface so domain can record a model as used without
+    // depending on data.
+    single<ModelUserStateRepository> { ModelUserStateStore(androidContext()) }
 
     // Chat history lives in its own database — see ChatDatabase for why it
     // must not join octa_missions (destructive fallback + no exported schema).

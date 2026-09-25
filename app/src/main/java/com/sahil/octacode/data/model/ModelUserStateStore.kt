@@ -3,6 +3,7 @@ package com.sahil.octacode.data.model
 import android.content.Context
 import android.content.SharedPreferences
 import com.sahil.octacode.core.model.ModelUserState
+import com.sahil.octacode.domain.model.ModelUserStateRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,25 +20,20 @@ import kotlinx.coroutines.flow.asStateFlow
  * Not encrypted. These are preferences, not secrets — API keys stay in
  * `CredentialStore`.
  */
-class ModelUserStateStore(context: Context) {
+class ModelUserStateStore(context: Context) : ModelUserStateRepository {
 
     private val prefs: SharedPreferences =
         context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
 
     private val _states = MutableStateFlow(ModelStateCodec.decode(prefs.all))
 
-    val states: StateFlow<Map<String, ModelUserState>> = _states.asStateFlow()
+    override val states: StateFlow<Map<String, ModelUserState>> = _states.asStateFlow()
 
-    /** Never null: an unrecorded model is a default, not a missing value. */
-    fun state(modelId: String): ModelUserState =
-        _states.value[modelId] ?: ModelUserState(modelId = modelId)
-
-    fun setFavorite(modelId: String, favorite: Boolean) {
+    override fun setFavorite(modelId: String, favorite: Boolean) {
         update(modelId) { it.copy(isFavorite = favorite) }
     }
 
-    /** Called when a model actually goes on the wire, not when it is tapped. */
-    fun markUsed(modelId: String, at: Long) {
+    override fun markUsed(modelId: String, at: Long) {
         update(modelId) { it.copy(lastUsedAt = at) }
     }
 
