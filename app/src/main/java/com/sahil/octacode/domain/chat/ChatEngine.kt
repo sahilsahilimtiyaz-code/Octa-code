@@ -104,6 +104,17 @@ class ChatEngine(
      * just does not appear in Recent.
      */
     private val modelState: ModelUserStateRepository? = null,
+    /**
+     * The folder new conversations record as theirs, read at the moment a
+     * session is created rather than captured at construction — picking a
+     * folder mid-conversation has to affect the next session, not the next
+     * app start.
+     *
+     * Null means "no folder chosen", which is the state the field was
+     * designed for and what every session carried before this existed.
+     * Tests' setup; production receives the workspace store's.
+     */
+    private val activeWorkspaceId: () -> String? = { null },
     private val clock: () -> Long = { System.currentTimeMillis() },
     scope: CoroutineScope? = null
 ) {
@@ -451,7 +462,10 @@ class ChatEngine(
     private suspend fun createSessionLocked(repo: ChatRepository, hint: ChatTurn): String {
         _state.value.sessionId?.let { return it }
         val created = repo.createSession(
-            profile = DefaultChain.of(modelOnWire(_state.value.selectedProvider)),
+            profile = DefaultChain.of(
+                modelId = modelOnWire(_state.value.selectedProvider),
+                workspaceId = activeWorkspaceId(),
+            ),
             title = titleFor(hint),
             now = hint.createdAt.takeIf { it > 0 } ?: nextStamp(),
         )

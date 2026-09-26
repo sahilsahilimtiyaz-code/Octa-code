@@ -59,11 +59,20 @@ import com.sahil.octacode.ui.theme.OnDarkMuted
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
-/** Reference bottom bar: Workspace / Code / Terminal. The header menu opens the side drawer. */
+/**
+ * Reference bottom bar: Home / Code / Terminal. The header menu opens the
+ * side drawer.
+ *
+ * The first tab used to be labelled "Workspace", which was true of the mock
+ * it came from and of nothing since: it opens [Routes.HOME], the mission
+ * hub. Now that Workspaces is a real destination meaning "folders this app
+ * may work in", two neighbouring controls would have used the same word for
+ * different things — so the tab says where it goes.
+ */
 private data class BottomDest(val route: String, val label: String, val icon: ImageVector)
 
 private val BOTTOM_DESTS = listOf(
-    BottomDest(Routes.HOME, "Workspace", Icons.Filled.Code),
+    BottomDest(Routes.HOME, "Home", Icons.Filled.Code),
     BottomDest(Routes.PROJECTS, "Code", Icons.Filled.Layers),
     BottomDest(Routes.TERMINAL, "Terminal", Icons.Filled.Terminal)
 )
@@ -140,6 +149,10 @@ private fun OctaScaffold() {
                     scope.launch { drawerState.close() }
                     goTo(Routes.PROJECTS)
                 },
+                onOpenWorkspaces = {
+                    scope.launch { drawerState.close() }
+                    goTo(Routes.WORKSPACES)
+                },
                 onOpenSettings = {
                     scope.launch { drawerState.close() }
                     goTo(Routes.SETTINGS)
@@ -174,7 +187,7 @@ private fun OctaScaffold() {
 
 /**
  * Glass bottom bar with a flat cyan active pill on the icon + label underline
- * — reference mock. Chat (Agent) highlights Workspace, matching the mock while
+ * — reference mock. Chat (Agent) highlights Home, matching the mock while
  * Chat is open.
  */
 @Composable

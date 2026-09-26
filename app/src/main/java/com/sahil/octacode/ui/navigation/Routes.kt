@@ -21,6 +21,11 @@ object Routes {
     const val SETTINGS_CHAT = "settings/chat"
     const val SETTINGS_SERVER = "settings/server"
 
+    // A destination of its own rather than a settings sub-page: folders are
+    // data the agent works on, not a preference about the app, and the chat
+    // pill has to be able to lead straight here.
+    const val WORKSPACES = "workspaces"
+
     const val MISSION_LAUNCH = "mission/launch"
     const val MISSION_DETAIL_PATTERN = "mission/{missionId}"
     const val ARG_MISSION_ID = "missionId"

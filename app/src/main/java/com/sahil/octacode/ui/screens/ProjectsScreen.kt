@@ -19,13 +19,20 @@ import androidx.compose.ui.unit.dp
  * to promise M5, and M5 has since shipped as settings and history work.
  * Nothing was ever built under it, so the screen now says that instead of
  * pointing at a release that has already happened.
+ *
+ * The second half changed with Workspaces. This text used to claim the
+ * system folder picker was not wired up; it is now, so saying so would be
+ * the exact falsehood this screen exists to avoid. Folders are real — what
+ * is missing is everything a project adds on top of one.
  */
 @Composable
 fun ProjectsScreen() {
     Box(Modifier.fillMaxSize().padding(20.dp), contentAlignment = Alignment.Center) {
         Text(
-            text = "No projects in this build — the system folder picker a " +
-                "project would come from is not wired up yet.",
+            text = "No projects in this build — a project would be a folder " +
+                "plus its repository, editor and build status. The folders " +
+                "themselves are real and are managed from Workspaces, in the " +
+                "menu.",
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
         )

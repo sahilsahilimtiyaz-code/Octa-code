@@ -21,6 +21,7 @@ import com.sahil.octacode.ui.screens.SettingsServerScreen
 import com.sahil.octacode.ui.screens.SettingsSessionsScreen
 import com.sahil.octacode.ui.screens.SplashScreen
 import com.sahil.octacode.ui.screens.TerminalScreen
+import com.sahil.octacode.ui.screens.WorkspacesScreen
 
 @Composable
 fun OctaNavGraph(
@@ -50,10 +51,14 @@ fun OctaNavGraph(
                 // the menu icon promises.
                 onOpenMenu = onOpenDrawer,
                 onOpenProfile = { navController.navigate(Routes.SETTINGS) },
-                onOpenProjects = { navController.navigate(Routes.PROJECTS) }
+                onOpenProjects = { navController.navigate(Routes.PROJECTS) },
+                onOpenWorkspaces = { navController.navigate(Routes.WORKSPACES) }
             )
         }
         composable(Routes.PROJECTS) { ProjectsScreen() }
+        composable(Routes.WORKSPACES) {
+            WorkspacesScreen(onBack = { navController.popBackStack() })
+        }
         composable(Routes.TERMINAL) { TerminalScreen() }
         composable(Routes.SETTINGS) {
             SettingsScreen(

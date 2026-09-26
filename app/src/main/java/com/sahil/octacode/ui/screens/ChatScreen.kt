@@ -58,6 +58,7 @@ import com.sahil.octacode.core.provider.AiProvider
 import com.sahil.octacode.core.provider.ProviderId
 import com.sahil.octacode.core.settings.SendBehavior
 import com.sahil.octacode.data.settings.SettingsRepository
+import com.sahil.octacode.data.workspace.WorkspaceStore
 import com.sahil.octacode.domain.chat.ChatEngine
 import com.sahil.octacode.domain.mission.MissionRepository
 import com.sahil.octacode.domain.mission.MissionStatus
@@ -90,16 +91,29 @@ fun ChatScreen(
     onOpenMenu: () -> Unit = {},
     onOpenProfile: () -> Unit = {},
     onOpenProjects: () -> Unit = {},
+    /**
+     * Where the folder pill and the composer's folder chip lead — both are
+     * promises to choose where work happens, and only Workspaces keeps them.
+     */
+    onOpenWorkspaces: () -> Unit = {},
     engine: ChatEngine = koinInject(),
     repository: MissionRepository = koinInject(),
     modelState: ModelUserStateRepository = koinInject(),
     /** Which endpoints have a registered adapter, so the sheet can say so. */
     adapters: Map<ProviderId, AiProvider> = koinInject(),
     settingsRepository: SettingsRepository = koinInject(),
+    workspaceStore: WorkspaceStore = koinInject(),
 ) {
     val state by engine.state.collectAsState()
     val modelStates by modelState.states.collectAsState()
     val settings by settingsRepository.settings.collectAsState()
+    val folderList by workspaceStore.workspaces.collectAsState()
+    val activeFolderId by workspaceStore.activeId.collectAsState()
+    /**
+     * Read from the id rather than held, so a folder renamed or removed here
+     * cannot leave the pill naming something that no longer exists.
+     */
+    val activeFolder = folderList.firstOrNull { it.id == activeFolderId }?.displayName
     /**
      * Queue mode is what decides whether the composer can be used mid-response
      * at all — under IMMEDIATELY it stays read-only, as it always has.
@@ -128,9 +142,9 @@ fun ChatScreen(
             missionNote = if (running == 0) {
                 "A mission feed appears after a real runtime starts work. Nothing is running now."
             } else if (running == 1) {
-                "1 mission active - open Workspace to inspect the pipeline."
+                "1 mission active - open Home to inspect the pipeline."
             } else {
-                "$running missions active - open Workspace to inspect the pipeline."
+                "$running missions active - open Home to inspect the pipeline."
             }
         }
     }
@@ -199,10 +213,14 @@ fun ChatScreen(
             }
 
             AgentStatusPill(
-                projectLabel = "No project selected",
+                // What the pill actually reports: where work happens. The old
+                // "No project selected" pointed at an index this build does
+                // not have; a folder is the thing that has always been
+                // selectable here, and it is now a real destination.
+                projectLabel = activeFolder ?: "No folder selected",
                 agentLabel = agentLabel,
                 agentReady = ready,
-                onProjectClick = onOpenProjects,
+                onProjectClick = onOpenWorkspaces,
                 modifier = Modifier.padding(horizontal = 20.dp)
             )
 
@@ -353,7 +371,7 @@ fun ChatScreen(
                 }
                 Box(modifier = Modifier.weight(1f)) {
                     ComposerPill(
-                        label = "Project",
+                        label = activeFolder ?: "Folder",
                         leadingIcon = {
                             Icon(
                                 Icons.Outlined.Folder,
@@ -369,9 +387,40 @@ fun ChatScreen(
                         expanded = projectMenu,
                         onDismissRequest = { projectMenu = false }
                     ) {
+                        // Every entry does the real thing: choosing one marks
+                        // it as the folder new conversations record, and the
+                        // last row leaves for the screen that can add more.
+                        folderList.forEach { folder ->
+                            val chosen = folder.id == activeFolderId
+                            DropdownMenuItem(
+                                text = { Text(if (chosen) "${folder.displayName} ✓" else folder.displayName) },
+                                onClick = {
+                                    if (chosen) {
+                                        workspaceStore.clearActive()
+                                    } else {
+                                        workspaceStore.setActive(folder.id)
+                                    }
+                                    projectMenu = false
+                                }
+                            )
+                        }
+                        if (folderList.isEmpty()) {
+                            // Disabled, not merely inert: a menu item that
+                            // looks tappable and only closes the menu is the
+                            // silent no-op this app does not ship. Dimmed, it
+                            // reads as the statement it is.
+                            DropdownMenuItem(
+                                text = { Text("No folder chosen yet") },
+                                onClick = { projectMenu = false },
+                                enabled = false
+                            )
+                        }
                         DropdownMenuItem(
-                            text = { Text("No project selected") },
-                            onClick = { projectMenu = false }
+                            text = { Text("Choose a folder…") },
+                            onClick = {
+                                projectMenu = false
+                                onOpenWorkspaces()
+                            }
                         )
                     }
                 }

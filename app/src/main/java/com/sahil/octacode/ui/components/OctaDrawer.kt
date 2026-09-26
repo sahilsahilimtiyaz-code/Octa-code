@@ -14,6 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -62,6 +63,7 @@ private const val RECENT_LIMIT = 5
 fun OctaDrawer(
     onOpenSession: (String) -> Unit,
     onOpenProjects: () -> Unit,
+    onOpenWorkspaces: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenManageChats: () -> Unit,
     modifier: Modifier = Modifier,
@@ -174,6 +176,11 @@ fun OctaDrawer(
                 title = "Projects",
                 icon = Icons.Outlined.Folder,
                 onClick = onOpenProjects,
+            )
+            DrawerNavRow(
+                title = "Workspaces",
+                icon = Icons.Outlined.FolderOpen,
+                onClick = onOpenWorkspaces,
             )
             DrawerNavRow(
                 title = "Settings",

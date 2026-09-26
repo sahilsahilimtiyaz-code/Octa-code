@@ -6,6 +6,7 @@ import com.sahil.octacode.core.capability.ProviderStatus
 import com.sahil.octacode.core.model.ModelCatalog
 import com.sahil.octacode.core.model.ModelDef
 import com.sahil.octacode.core.model.ModelUserState
+import com.sahil.octacode.core.profile.RunProfile
 import com.sahil.octacode.core.provider.AiProvider
 import com.sahil.octacode.core.provider.CapabilityBadge
 import com.sahil.octacode.core.provider.ChatChunk
@@ -59,14 +60,48 @@ private fun chatEngine(
     providers: Map<ProviderId, AiProvider>,
     scope: CoroutineScope,
     modelState: ModelUserStateRepository? = null,
+    repository: ChatRepository? = null,
+    activeWorkspaceId: () -> String? = { null },
     clock: () -> Long = { System.currentTimeMillis() }
 ): ChatEngine = ChatEngine(
     registry = registry,
     providers = providers,
     modelState = modelState,
+    repository = repository,
+    activeWorkspaceId = activeWorkspaceId,
     clock = clock,
     scope = scope
 )
+
+/**
+ * Captures the profile a session is created with — the one thing this
+ * repository exists to observe here. The rest of the interface is never
+ * exercised by the tests that use it.
+ */
+private class RecordingRepository : ChatRepository {
+    var createdProfile: RunProfile? = null
+
+    override val sessions: Flow<List<ChatSession>> = flow { emit(emptyList()) }
+
+    override suspend fun createSession(profile: RunProfile, title: String, now: Long): ChatSession {
+        createdProfile = profile
+        return ChatSession(
+            id = "session-1",
+            title = title,
+            profile = profile,
+            createdAt = now,
+            lastMessageAt = now,
+        )
+    }
+
+    override suspend fun session(id: String): ChatSession? = null
+    override suspend fun turns(sessionId: String): List<StoredTurn> = emptyList()
+    override suspend fun append(turn: StoredTurn) = Unit
+    override suspend fun renameSession(sessionId: String, title: String) = Unit
+    override suspend fun setArchived(sessionId: String, at: Long?) = Unit
+    override suspend fun setArchived(sessionIds: Collection<String>, at: Long) = Unit
+    override suspend fun deleteSession(sessionId: String) = Unit
+}
 
 /**
  * Captures the request the engine actually builds, so "what goes on the wire"
@@ -367,6 +402,70 @@ class ChatEngineTest {
         assertTrue(engine.send("hi"))
         testScheduler.advanceUntilIdle()
         assertEquals(listOf("gpt-4.1" to 1_700_000_000_000L), modelState.used)
+    }
+
+    @Test
+    fun `a new conversation records the folder it works in`() = runTest {
+        val repository = RecordingRepository()
+        val engine = chatEngine(
+            registry = readyRegistry(),
+            providers = mapOf(
+                ProviderId.OPENAI to LambdaProvider {
+                    flow {
+                        emit(ChatChunk("ok"))
+                        emit(ChatChunk("", done = true))
+                    }
+                }
+            ),
+            scope = this,
+            repository = repository,
+            activeWorkspaceId = { "workspace-1" }
+        )
+        engine.refreshProviderStatus()
+        assertTrue(engine.send("hi"))
+        testScheduler.advanceUntilIdle()
+        yield()
+        testScheduler.advanceUntilIdle()
+
+        // The whole point of RunProfile.workspaceId: a session is one instance
+        // of the chain, so reopening it should restore the folder as well as
+        // the model. Before this it was written and never set.
+        assertEquals("workspace-1", repository.createdProfile?.workspaceId)
+        assertNull(engine.state.value.persistenceError)
+    }
+
+    @Test
+    fun `a conversation with no folder chosen records none`() = runTest {
+        val repository = RecordingRepository()
+        val engine = chatEngine(
+            registry = readyRegistry(),
+            providers = mapOf(
+                ProviderId.OPENAI to LambdaProvider {
+                    flow {
+                        emit(ChatChunk("ok"))
+                        emit(ChatChunk("", done = true))
+                    }
+                }
+            ),
+            scope = this,
+            repository = repository,
+            activeWorkspaceId = { null }
+        )
+        engine.refreshProviderStatus()
+        assertTrue(engine.send("hi"))
+        testScheduler.advanceUntilIdle()
+        yield()
+        testScheduler.advanceUntilIdle()
+
+        // Null is a real value here, not a placeholder: RunProfile allows a
+        // conversation opened before a folder was picked, and inventing one
+        // would attribute work to a folder nobody chose.
+        //
+        // Asserting the session exists first, or this would pass equally well
+        // had persistence never run at all.
+        assertNotNull(repository.createdProfile)
+        assertNull(repository.createdProfile?.workspaceId)
+        assertNull(engine.state.value.persistenceError)
     }
 
     @Test

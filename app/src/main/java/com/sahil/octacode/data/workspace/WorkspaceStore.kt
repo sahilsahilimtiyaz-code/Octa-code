@@ -40,6 +40,19 @@ class WorkspaceStore(context: Context) {
     val workspaces: StateFlow<List<Workspace>> = _workspaces.asStateFlow()
 
     /**
+     * Which folder new conversations are recorded against, or null when none
+     * is chosen — the state [com.sahil.octacode.core.profile.RunProfile] was
+     * written to allow, and until now the only state that ever occurred,
+     * because nothing could set it.
+     *
+     * Held as an id rather than a snapshot of the workspace, so the row a
+     * caller reads cannot drift from the list it belongs to after a rename,
+     * a star or a grant being withdrawn behind our back.
+     */
+    private val _activeId = MutableStateFlow(readActive())
+    val activeId: StateFlow<String?> = _activeId.asStateFlow()
+
+    /**
      * Adds the tree the user just chose and takes the persistable grant for
      * it. Returns whether that grant succeeded, because failing to take it is
      * the one case where the row exists but would not work — the caller needs
@@ -52,10 +65,20 @@ class WorkspaceStore(context: Context) {
     fun add(uri: Uri): Boolean {
         val tree = uri.toString()
         val granted = takeGrant(uri)
+        // Picking a tree that is already listed re-grants it rather than
+        // creating a second row. Keeping the old id is what stops the choice
+        // from being orphaned: a fresh UUID here would leave activeId naming
+        // a record that no longer exists, and the selection would silently
+        // read back as none. The star and last-used stamp survive for the
+        // same reason — they describe the folder, which has not changed.
+        val previous = _workspaces.value.firstOrNull { it.uri == tree }
         val workspace = Workspace(
-            id = UUID.randomUUID().toString(),
+            id = previous?.id ?: UUID.randomUUID().toString(),
             displayName = nameFor(uri),
             uri = tree,
+            runtimeId = previous?.runtimeId,
+            lastUsedAt = previous?.lastUsedAt,
+            isFavorite = previous?.isFavorite ?: false,
             persisted = granted,
         )
         setAll(_workspaces.value.filter { it.uri != tree } + workspace)
@@ -74,6 +97,10 @@ class WorkspaceStore(context: Context) {
                 Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
             )
         }
+        // Clearing the choice first, so the write that follows persists both
+        // facts together. Leaving a dangling id would name a folder that is
+        // no longer listed, and every consumer would read it as missing.
+        if (_activeId.value == id) _activeId.value = null
         setAll(_workspaces.value.filterNot { it.id == id })
     }
 
@@ -81,9 +108,40 @@ class WorkspaceStore(context: Context) {
         it.copy(isFavorite = favorite)
     }
 
-    /** Records when a folder was last worked in; the picker sorts on this. */
-    fun markUsed(id: String, at: Long) = update(id) {
-        it.copy(lastUsedAt = at)
+    /**
+     * Drops the choice without touching the list. Worth having separately:
+     * [setActive] deliberately refuses an id it is already holding, so using
+     * it to unselect would be a call that returns having changed nothing —
+     * a tap that silently does nothing.
+     */
+    fun clearActive() {
+        if (_activeId.value == null) return
+        _activeId.value = null
+        persist()
+    }
+
+    /**
+     * Chooses the folder this conversation works in, and records the moment
+     * as the folder's last use.
+     *
+     * Deliberately does not go through [setAll]: this writes two facts at
+     * once, and a folder whose last-used stamp happened to land on the same
+     * millisecond would leave the list unchanged — [setAll] would then find
+     * nothing to do and drop the selection on the floor.
+     *
+     * Selecting a folder that is not listed is refused rather than stored: an
+     * id pointing at nothing would render as "no folder selected" while
+     * still being truthfully present on disk, which is worse than either.
+     */
+    fun setActive(id: String) {
+        if (_workspaces.value.none { it.id == id }) return
+        if (_activeId.value == id) return
+        val now = System.currentTimeMillis()
+        _activeId.value = id
+        _workspaces.value = _workspaces.value.map {
+            if (it.id == id) it.copy(lastUsedAt = now) else it
+        }
+        persist()
     }
 
     private fun update(id: String, transform: (Workspace) -> Workspace) {
@@ -96,7 +154,7 @@ class WorkspaceStore(context: Context) {
     private fun setAll(next: List<Workspace>) {
         if (next == _workspaces.value) return
         _workspaces.value = next
-        write(next)
+        persist()
     }
 
     /**
@@ -106,6 +164,15 @@ class WorkspaceStore(context: Context) {
      */
     private fun load(): List<Workspace> = WorkspaceCodec.decode(prefs.all)
         .map { it.copy(persisted = holdsGrant(it.uri)) }
+
+    /**
+     * The stored choice, dropped if the folder it names is gone. An id with
+     * nothing behind it would otherwise read as a selection the app cannot
+     * show — the chat pill and the composer's folder chip would both stay
+     * silent while disk insisted a folder was chosen.
+     */
+    private fun readActive(): String? = prefs.getString(KEY_ACTIVE, null)
+        ?.takeIf { id -> _workspaces.value.any { it.id == id } }
 
     private fun holdsGrant(uri: String): Boolean = runCatching {
         appContext.contentResolver.persistedUriPermissions
@@ -133,11 +200,15 @@ class WorkspaceStore(context: Context) {
         return withoutScheme.ifBlank { segment }
     }
 
-    private fun write(workspaces: List<Workspace>) {
-        // clear() first keeps the file authoritative: a removed folder cannot
-        // linger as keys from a previous write and reappear on restart.
+    /**
+     * Writes both facts as one transaction. Clearing first keeps the file
+     * authoritative: a removed folder cannot linger as keys from a previous
+     * write and reappear on restart, and the selection cannot outlive it
+     * either — they are written together or not at all.
+     */
+    private fun persist() {
         val editor = prefs.edit().clear()
-        WorkspaceCodec.encode(workspaces).forEach { (key, value) ->
+        WorkspaceCodec.encode(_workspaces.value).forEach { (key, value) ->
             when (value) {
                 is String -> editor.putString(key, value)
                 is Long -> editor.putLong(key, value)
@@ -149,10 +220,16 @@ class WorkspaceStore(context: Context) {
                 )
             }
         }
+        // Not encoded by WorkspaceCodec: the choice is one value about the
+        // list as a whole, not a fact belonging to any single workspace.
+        _activeId.value?.let { editor.putString(KEY_ACTIVE, it) }
         editor.apply()
     }
 
     private companion object {
         const val FILE_NAME = "octa_workspaces"
+
+        /** Sits outside the codec's `ws.*` namespace so decode ignores it. */
+        const val KEY_ACTIVE = "active_workspace"
     }
 }

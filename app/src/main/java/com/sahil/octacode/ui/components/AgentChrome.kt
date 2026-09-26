@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sahil.octacode.ui.motion.LocalMotionPolicy
@@ -213,6 +214,11 @@ fun AgentStatusPill(
                 style = MaterialTheme.typography.bodyMedium,
                 color = OnDark,
                 maxLines = 1,
+                // Folder names are user data and can be longer than the
+                // "No folder selected" placeholder this used to hold, so the
+                // label is elided rather than cut off mid-word against the
+                // chevron beside it.
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = true)
             )
             Icon(
@@ -459,7 +465,14 @@ fun ComposerPill(
             text = label,
             style = MaterialTheme.typography.bodyMedium,
             color = OnDark,
-            maxLines = 1
+            maxLines = 1,
+            // The label is now user data — a folder name can be far longer
+            // than the "Project" placeholder this used to hold. Taking the
+            // remaining width is what keeps the chevron beside it inside the
+            // pill instead of being pushed past its clipped edge, and gives
+            // the text a boundary to ellipsize against.
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
         )
         Spacer(Modifier.width(2.dp))
         Icon(
