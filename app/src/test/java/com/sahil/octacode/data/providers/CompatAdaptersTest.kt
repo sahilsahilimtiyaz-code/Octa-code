@@ -1,5 +1,6 @@
 package com.sahil.octacode.data.providers
 
+import com.sahil.octacode.core.provider.ProviderId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -71,12 +72,31 @@ class CompatAdaptersTest {
 
     @Test
     fun `a key from another provider is caught before the request`() {
+        // Points at OpenRouter's own card now that OpenRouter has one; telling
+        // the user to use Custom endpoint would send them to a worse place than
+        // the box that actually exists for their key.
         assertEquals(
-            "This is an OpenRouter key — paste it into Custom endpoint instead of OpenAI",
+            "OpenRouter key detected — paste it into OpenRouter instead of OpenAI",
             foreignProviderHint("sk-or-v1-abcdef123456")
         )
         assertTrue(foreignProviderHint("sk-ant-api03-xyz")!!.contains("Anthropic"))
         assertTrue(foreignProviderHint("AIzaSyExample")!!.contains("Gemini"))
+    }
+
+    @Test
+    fun `a key is only called misplaced when it is actually in the wrong box`() {
+        // Right box stays silent, or every Groq session would open by being
+        // told its own key was a Groq key.
+        assertNull(foreignProviderHint("sk-or-v1-abcdef123456", ProviderId.OPENROUTER))
+        assertNull(foreignProviderHint("gsk_abcdef123456", ProviderId.GROQ))
+        assertNull(foreignProviderHint("xai-abcdef123456", ProviderId.XAI))
+
+        // Wrong box gets named, with the destination the user should use.
+        assertTrue(foreignProviderHint("gsk_abcdef123456", ProviderId.DEEPSEEK)!!.contains("Groq"))
+        assertTrue(foreignProviderHint("xai-abcdef123456", ProviderId.MISTRAL)!!.contains("xAI"))
+        assertTrue(
+            foreignProviderHint("sk-or-v1-abcdef123456", ProviderId.XAI)!!.contains("OpenRouter")
+        )
     }
 
     @Test

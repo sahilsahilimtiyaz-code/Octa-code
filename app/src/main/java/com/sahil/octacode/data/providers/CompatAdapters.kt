@@ -145,19 +145,43 @@ private fun unescapeJson(value: String): String = buildString(value.length) {
 }
 
 /**
- * Key prefixes that survive a bare `startsWith("sk-")` check but belong to a
- * different provider. An OpenRouter key (`sk-or-…`) passes OpenAI's format
- * validation and is only rejected once the request is sent — which reads to the
- * user as the app being broken rather than the wrong box being filled in.
+ * Which provider a key actually belongs to, when its prefix is unique to one.
+ *
+ * Why this exists at all: an OpenRouter key (`sk-or-…`) passes a bare
+ * `startsWith("sk-")` format check, so the mistake only surfaced once the
+ * request had already been sent — which reads to the user as the app being
+ * broken rather than as the wrong box being filled in.
+ *
+ * @param target the provider the key was pasted into. A key matching its own
+ *   provider is not a mistake, so that returns null. This used to speak as if
+ *   the target were always OpenAI, which would have started accusing
+ *   OpenRouter keys of being misplaced once OpenRouter had a box of its own.
+ *
+ * Deliberately silent about shared prefixes: `sk-` alone covers OpenAI,
+ * DeepSeek and others, and `sk-proj-` / `sk-svcacct-` are OpenAI's own.
+ * Naming a provider on a guess would tell the user something untrue about a
+ * key that is perfectly valid, so only prefixes unique to one provider are
+ * ever named.
  */
-internal fun foreignProviderHint(key: String): String? = when {
-    key.startsWith("sk-or-") ->
-        "This is an OpenRouter key — paste it into Custom endpoint instead of OpenAI"
-    key.startsWith("sk-ant-") || key.startsWith("sk-claude") ->
-        "This is an Anthropic key — Claude is not implemented in this build"
-    key.startsWith("AIza") || key.startsWith("sk-google") ->
-        "This is a Google AI key — Gemini is not implemented in this build"
-    else -> null
+internal fun foreignProviderHint(key: String, target: ProviderId = ProviderId.OPENAI): String? {
+    val owner = when {
+        key.startsWith("sk-or-") -> ProviderId.OPENROUTER
+        key.startsWith("gsk_") -> ProviderId.GROQ
+        key.startsWith("xai-") -> ProviderId.XAI
+        key.startsWith("sk-ant-") || key.startsWith("sk-claude") -> ProviderId.CLAUDE
+        key.startsWith("AIza") || key.startsWith("sk-google") -> ProviderId.GEMINI
+        else -> return null
+    }
+    if (owner == target) return null
+    // Wording avoids the indefinite article: interpolating it produced
+    // "This is a OpenRouter key", and the obvious vowel fix would have said
+    // "a xAI key" — which is pronounced "ex-eye". "Key detected" reads
+    // correctly for every name and is literally what happened.
+    return when (owner) {
+        ProviderId.CLAUDE -> "This is an Anthropic key — Claude is not implemented in this build"
+        ProviderId.GEMINI -> "This is a Google AI key — Gemini is not implemented in this build"
+        else -> "${owner.title} key detected — paste it into ${owner.title} instead of ${target.title}"
+    }
 }
 
 // Real OpenAI adapter: https://api.openai.com/v1 — key from CredentialStore.

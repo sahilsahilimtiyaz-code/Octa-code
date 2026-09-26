@@ -31,6 +31,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.sahil.octacode.core.capability.CapabilityRegistry
 import com.sahil.octacode.core.capability.ProviderStatus
+import com.sahil.octacode.core.provider.AiProvider
 import com.sahil.octacode.core.provider.CapabilityBadge
 import com.sahil.octacode.core.provider.ProviderId
 import com.sahil.octacode.data.security.CredentialStore
@@ -49,6 +50,11 @@ fun SettingsProvidersScreen(
     onBack: () -> Unit,
     registry: CapabilityRegistry = koinInject(),
     credentials: CredentialStore = koinInject(),
+    // Read from the DI graph rather than listed by hand: this screen and the
+    // chat path must agree on which providers exist. Hand-writing the list
+    // allowed a provider to be reachable in chat while its key field was
+    // missing here — with no way for the user to supply the key at all.
+    adapters: Map<ProviderId, AiProvider> = koinInject(),
 ) {
     val scope = rememberCoroutineScope()
     var statuses by remember { mutableStateOf<Map<ProviderId, ProviderStatus>>(emptyMap()) }
@@ -57,6 +63,14 @@ fun SettingsProvidersScreen(
     fun refresh() {
         scope.launch { statuses = registry.refreshAll() }
     }
+
+    // Registered and key-bearing, in enum order. Custom endpoint is excluded
+    // because it takes a URL and a model as well as a key, so it has its own
+    // card below rather than a plain key field.
+    val keyed = ProviderId.entries.filter { it != ProviderId.CUSTOM && it in adapters }
+    // Declared but not wired: shown as unavailable rather than hidden, so the
+    // absence is visible instead of looking like the app simply forgot them.
+    val unimplemented = ProviderId.entries.filter { it != ProviderId.CUSTOM && it !in adapters }
 
     Column(
         Modifier
@@ -73,17 +87,20 @@ fun SettingsProvidersScreen(
 
         Text("Providers", style = MaterialTheme.typography.titleMedium)
 
-        ApiKeyCard(
-            id = ProviderId.OPENAI,
-            badge = CapabilityBadge.API,
-            status = statuses[ProviderId.OPENAI],
-            savedKey = credentials.getApiKey(ProviderId.OPENAI),
-            onSaveKey = { credentials.setApiKey(ProviderId.OPENAI, it); refresh() },
-            onClearKey = { credentials.clearApiKey(ProviderId.OPENAI); refresh() }
-        )
+        keyed.forEach { id ->
+            ApiKeyCard(
+                id = id,
+                badge = CapabilityBadge.API,
+                status = statuses[id],
+                savedKey = credentials.getApiKey(id),
+                onSaveKey = { credentials.setApiKey(id, it); refresh() },
+                onClearKey = { credentials.clearApiKey(id); refresh() }
+            )
+        }
         CustomEndpointCard(credentials, statuses[ProviderId.CUSTOM], onChanged = { refresh() })
-        UnavailableCard(ProviderId.CLAUDE, CapabilityBadge.UNAVAILABLE, statuses[ProviderId.CLAUDE])
-        UnavailableCard(ProviderId.GEMINI, CapabilityBadge.UNAVAILABLE, statuses[ProviderId.GEMINI])
+        unimplemented.forEach { id ->
+            UnavailableCard(id, CapabilityBadge.UNAVAILABLE, statuses[id])
+        }
 
         Text(
             "Provider status is probed, never assumed.",

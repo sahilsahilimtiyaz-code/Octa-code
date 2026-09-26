@@ -7,6 +7,7 @@ import com.sahil.octacode.data.net.KtorHttpFactory
 import com.sahil.octacode.data.providers.CustomEndpointAdapter
 import com.sahil.octacode.data.providers.DefaultCapabilityRegistry
 import com.sahil.octacode.data.providers.OpenAiAdapter
+import com.sahil.octacode.data.providers.namedProviderAdapters
 import com.sahil.octacode.data.security.CredentialStore
 import io.ktor.client.HttpClient
 import org.koin.android.ext.koin.androidContext
@@ -22,11 +23,14 @@ val appModule = module {
     single<CustomEndpointAdapter> { CustomEndpointAdapter(get(), get()) }
 
     single<Map<ProviderId, AiProvider>> {
-        mapOf(
+        // Two bespoke adapters plus every provider that speaks the OpenAI
+        // protocol (DeepSeek, Groq, Mistral, xAI, OpenRouter) — one shared
+        // class each, differing only in base URL and key slot.
+        mapOf<ProviderId, AiProvider>(
             ProviderId.OPENAI to get<OpenAiAdapter>(),
             ProviderId.CUSTOM to get<CustomEndpointAdapter>()
-            // CLAUDE / GEMINI intentionally absent in M2 → registry reports Unavailable.
-        )
+        ) + namedProviderAdapters(get<HttpClient>(), get<CredentialStore>())
+        // CLAUDE / GEMINI still absent → the registry reports them Unavailable.
     }
 
     single<CapabilityRegistry> { DefaultCapabilityRegistry(get()) }
