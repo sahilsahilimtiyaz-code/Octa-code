@@ -11,6 +11,7 @@ import com.sahil.octacode.data.mission.PhaseRunDao
 import com.sahil.octacode.data.mission.RoomMissionRepository
 import com.sahil.octacode.data.model.ModelUserStateStore
 import com.sahil.octacode.data.settings.SettingsRepository
+import com.sahil.octacode.data.workspace.WorkspaceStore
 import com.sahil.octacode.domain.chat.ChatRepository
 import com.sahil.octacode.domain.chat.RetentionReport
 import com.sahil.octacode.domain.model.ModelUserStateRepository
@@ -45,6 +46,13 @@ val dataModule = module {
     // bound to the interface so domain can record a model as used without
     // depending on data.
     single<ModelUserStateRepository> { ModelUserStateStore(androidContext()) }
+
+    // Folders the agent works in. Beside the others because it is the same
+    // kind of thing — preferences read as a flow — with one exception that
+    // matters: the SAF grant is re-checked against the live permission list
+    // on every load. A content:// tree the user revoked from outside the app
+    // must not keep reading as usable just because we once held it.
+    single<WorkspaceStore> { WorkspaceStore(androidContext()) }
 
     // Chat history lives in its own database — see ChatDatabase for why it
     // must not join octa_missions (destructive fallback + no exported schema).
