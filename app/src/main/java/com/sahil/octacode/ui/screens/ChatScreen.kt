@@ -311,12 +311,19 @@ fun ChatScreen(
             }
 
             state.lastError?.let { err ->
-                Text(
-                    text = err,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = WarningAmber,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
-                )
+                // A failed send writes its reason into the bubble now, and that
+                // bubble stays after the next send clears lastError — printing
+                // the identical sentence twice at the same moment is only noise.
+                // This line therefore keeps the errors that live nowhere else:
+                // provider unavailable, no adapter, conversation gone.
+                if (state.turns.lastOrNull()?.error != err) {
+                    Text(
+                        text = err,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = WarningAmber,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
+                    )
+                }
             }
 
             // A failed history write has to be said out loud. The chat keeps

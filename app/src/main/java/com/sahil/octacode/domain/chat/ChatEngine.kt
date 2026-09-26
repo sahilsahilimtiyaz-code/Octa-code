@@ -11,7 +11,7 @@ import com.sahil.octacode.core.provider.ChatRole
 import com.sahil.octacode.core.provider.ProviderId
 import com.sahil.octacode.core.provider.defaultModelFor
 import com.sahil.octacode.core.profile.DefaultChain
-import com.sahil.octacode.data.providers.ProviderHttpException
+import com.sahil.octacode.data.providers.explainSendFailure
 import com.sahil.octacode.domain.model.ModelUserStateRepository
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
@@ -390,10 +390,15 @@ class ChatEngine(
                     throw c
                 }
             } catch (t: Throwable) {
+                // IllegalStateException is left alone deliberately: an adapter's
+                // pre-flight check ("no API key configured", "endpoint is blank")
+                // already names what is missing. Everything else — HTTP status,
+                // offline, timeout, unreadable reply — went through as a raw
+                // exception string or a bare class name, which is what the user
+                // was reading as "failed some error".
                 val reason = when (t) {
-                    is ProviderHttpException -> "Provider error ${t.status}: ${t.message}"
                     is IllegalStateException -> t.message ?: "Provider not ready"
-                    else -> t.message ?: t::class.java.simpleName
+                    else -> explainSendFailure(t, providerId.title, modelId)
                 }
                 finalize(assistantId, buffer.toString(), error = reason, stopped = false)
             }

@@ -128,9 +128,13 @@ private fun BubbleText(turn: ChatTurn, modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.bodyMedium,
             color = if (turn.error != null && turn.text.startsWith("—")) OnDarkMuted else OnDark,
         )
-        if (turn.error != null && turn.error != "stopped" && turn.text.isNotBlank() &&
-            !turn.text.startsWith("—")
-        ) {
+        // Deliberately NOT gated on the text. A failure that happens before a
+        // single token arrives sets text to "— request failed —", and the old
+        // `!turn.text.startsWith("—")` guard hid the reason on exactly that
+        // path: the label said Failed, the body said request failed, and
+        // nothing anywhere said why. The bubble is the durable record of the
+        // error — lastError is cleared by the next send, this is not.
+        if (turn.error != null && turn.error != "stopped") {
             Text(
                 text = turn.error,
                 style = MaterialTheme.typography.labelSmall,
