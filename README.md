@@ -184,6 +184,44 @@ Native Android AI coding workstation. No legacy, no stubs wired as real.
   header checksum, non-deb input — plus installer install/uninstall/shared-path and index
   lookup suites. **148 tests, all passing** (`:app:testDebugUnitTest`).
 
+### R3 Execution (the prefix can run)
+
+Nothing in R1/R2 could start, and the obstacle was never missing code —
+Android refuses `exec()` on files an app is allowed to write once the app
+targets API 29+ (W^X). The original plan assumed jniLibs `lib*.so` workarounds;
+that cannot work here, because those only cover binaries shipped inside the APK,
+while **every** binary in the downloaded rootfs sits in app-writable storage.
+The one route that executes a *downloaded* prefix is the pin Termux uses.
+
+- `targetSdk 34 → 28`, with the reason recorded beside the value in
+  `app/build.gradle`. It costs nothing here: the manifest asks only for
+  `INTERNET` and `ACCESS_NETWORK_STATE`, folders are picked through SAF rather
+  than scoped storage, and releases ship on GitHub rather than the Play Store
+  (which mandates a far newer target).
+- `core/shell/PrefixShell` resolves `bash → dash → sh` **through
+  `RuntimeIndex`**, so it can only ever start a binary this app verified and
+  unpacked — the host's `/bin/sh` is never borrowed. The environment is
+  Termux-shaped (`PREFIX`, `HOME`, `TMPDIR`, prefix leading `PATH`, and
+  `LD_LIBRARY_PATH` into the prefix's `lib`, without which these packages cannot
+  resolve their own dependencies) with `TERM=dumb`, because there is no
+  pseudo-terminal behind this runner.
+- Failures stay failures: no runtime → exit **127** with a message naming the
+  fix; spawn refused → **126**; timeout → **124** (GNU convention), the process
+  is killed and its partial output kept rather than discarded.
+- The Terminal screen replaces the "No shell in this build" placeholder: it
+  echoes the command, prints stdout/stderr verbatim, appends `→ exit N` only
+  when the code is not zero, and — when nothing is installed — shows the
+  install message with a button that really navigates to Settings → Runtime,
+  instead of offering a prompt that would accept input and do nothing.
+- `RuntimeScreen` no longer claims the unpacked files are "not yet executable",
+  which stopped being true when R3 landed.
+- Tests: **17 in `PrefixShellTest`** copy this host's own `/bin/sh` into a
+  fixture prefix to exercise the genuine `ProcessBuilder` wiring — environment,
+  concurrent stdout/stderr draining, exit-code capture, working directory —
+  alongside shell preference, host-`PATH` refusal, not-installed behaviour and
+  display rules. They skip cleanly on a host with no POSIX shell.
+  **283 tests, all passing** (`:app:testDebugUnitTest`).
+
 ### M4.4 Provider diagnostics + neon theme pass
 
 Two reported failures were the app withholding information it already had; a
@@ -229,8 +267,8 @@ outline. Composer pill regraded to a neon border.
 ### Runtime (on-device coding environment)
 - **R1** Pinned manifest + downloader + verification ledger + Runtime screen — **done**
 - **R2** Unpack `.deb` → `$PREFIX`, `RuntimeIndex`, install/uninstall — **done**
-- **R3** Exec bootstrap (jniLibs `lib*.so` + PRoot) — Android 10+ W^X compliance
-- **R4** PRoot rootfs + base userland → real shell in Terminal
+- **R3** Exec bootstrap — `targetSdk 28`, `PrefixShell`, Terminal runs commands — **done**
+- **R4** PRoot rootfs + interactive pseudo-terminal in Terminal
 - **R5** Node/npm → install OpenCode / Claude Code CLI → stream into Chat
 - **R6** Python + dev tools + project import (git clone / SAF / zip) — M5
 - **R7** Rust on demand + foreground service / Doze exemption for background agents

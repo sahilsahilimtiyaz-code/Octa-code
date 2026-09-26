@@ -42,9 +42,10 @@ import org.koin.compose.koinInject
  *
  * The screen never conflates the two halves: "verified" means the bytes matched
  * their pinned SHA-256, "installed" means they were afterwards unpacked onto
- * disk. The files really are there after this milestone — but they are not yet
- * executable, because Android blocks running anything the app can write. That
- * is R3, and the screen says so rather than implying `node` already runs.
+ * disk. Since R3 these files are also executable — the app targets API 28 so
+ * Android will permit exec() on them — and PrefixShell resolves its shell from
+ * exactly this prefix, so what is listed here is what the Terminal runs.
+ * PRoot isolation and a pseudo-terminal are still R4.
  */
 @Composable
 fun RuntimeScreen(
@@ -170,10 +171,12 @@ fun RuntimeScreen(
         GlassPanel(title = "What happens next") {
             Text(
                 "R2 unpacks verified artifacts into the app's prefix, so the files are genuinely " +
-                    "on disk, listed, and removable. They are not yet executable — Android refuses " +
-                    "to run anything the app is allowed to write, so making them runnable is the " +
-                    "exec runtime milestone (R3). Until then no tool is reported to the mission " +
-                    "pipeline as available.",
+                    "on disk, listed, and removable. Since R3 they are executable too: the " +
+                    "Terminal tab resolves its shell from this same prefix, so installing " +
+                    "\"Linux userland\" is what puts a working command line in your hands. " +
+                    "Still to come is R4 — a PRoot rootfs and an interactive pseudo-terminal. " +
+                    "The mission pipeline runs against the device's own PATH, where no dev " +
+                    "toolchain is present.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

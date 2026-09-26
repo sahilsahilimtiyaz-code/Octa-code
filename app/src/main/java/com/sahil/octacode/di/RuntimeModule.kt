@@ -7,6 +7,7 @@ import com.sahil.octacode.core.runtime.RuntimeIndex
 import com.sahil.octacode.core.runtime.RuntimeLedger
 import com.sahil.octacode.core.runtime.RuntimeManifest
 import com.sahil.octacode.core.runtime.RuntimeProvisioner
+import com.sahil.octacode.core.shell.PrefixShell
 import com.sahil.octacode.data.net.KtorHttpFactory
 import java.io.File
 import org.koin.android.ext.koin.androidContext
@@ -14,8 +15,9 @@ import org.koin.dsl.module
 
 // R1/R2 runtime graph: bundled manifest → downloader (own client, no request
 // cap) → verification ledger → installer → provisioner, plus the index that
-// answers "where is tool X" from what is genuinely on disk. Consumed by
-// RuntimeScreen.
+// answers "where is tool X" from what is genuinely on disk, and the shell
+// (R3) that executes what the index names. Consumed by RuntimeScreen and
+// TerminalScreen.
 val runtimeModule = module {
     single<RuntimeManifest> { BundledRuntimeManifest(androidContext().assets).load() }
 
@@ -29,6 +31,17 @@ val runtimeModule = module {
     single { ArtifactInstaller(File(androidContext().filesDir, "runtimes/prefix"), get()) }
 
     single { RuntimeIndex(File(androidContext().filesDir, "runtimes/prefix"), get()) }
+
+    // R3: the index says where a shell is, this runs it. HOME lives outside
+    // the prefix so uninstalling the runtime cannot delete the shell's own
+    // home directory, and so a shell never writes into unpacked package files.
+    single {
+        PrefixShell(
+            prefix = File(androidContext().filesDir, "runtimes/prefix"),
+            home = File(androidContext().filesDir, "home"),
+            index = get()
+        )
+    }
 
     single {
         RuntimeProvisioner(

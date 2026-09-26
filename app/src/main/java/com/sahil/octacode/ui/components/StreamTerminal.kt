@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.sahil.octacode.ui.theme.NeonGreen
 import com.sahil.octacode.ui.theme.OnDarkMuted
@@ -32,7 +33,10 @@ import com.sahil.octacode.ui.theme.codeTextStyle
 fun StreamTerminal(
     lines: List<String>,
     modifier: Modifier = Modifier,
-    emptyHint: String = "No events yet — engine idle"
+    emptyHint: String = "No events yet — engine idle",
+    // Optional because MissionDetailScreen shares this component and is happy
+    // with the original cap; the terminal screen wants every spare pixel.
+    maxHeight: Dp = 280.dp
 ) {
     val listState = rememberLazyListState()
     val clipboard = LocalClipboardManager.current
@@ -72,7 +76,7 @@ fun StreamTerminal(
             state = listState,
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 120.dp, max = 280.dp)
+                .heightIn(min = 120.dp, max = maxHeight)
                 .clip(RoundedCornerShape(12.dp))
                 .background(SurfaceDark)
                 .padding(10.dp)

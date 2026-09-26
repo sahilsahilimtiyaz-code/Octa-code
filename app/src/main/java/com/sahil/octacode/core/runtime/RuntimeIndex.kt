@@ -9,9 +9,11 @@ import java.io.File
  * files this app verified and installed itself — never at anything that merely
  * happens to be lying around on the device.
  *
- * Execution is a separate question and lands with R3: until then a returned
- * path means "present on disk", not "runnable", and callers must not pretend
- * otherwise.
+ * Execution is R3's business: PrefixShell asks this for bash/dash/sh and runs
+ * whatever comes back, so resolving through the ledger is what guarantees a
+ * shell is started from files this app verified rather than from the host.
+ * A returned path still means only "installed by us and present on disk" —
+ * nothing here proves the bytes are a working program.
  */
 class RuntimeIndex(
     private val prefix: File,

@@ -12,7 +12,20 @@ android {
     defaultConfig {
         applicationId 'com.sahil.octacode'
         minSdk 26
-        targetSdk 34
+        // R3 depends on this, and it is deliberate — do not raise it.
+        //
+        // Android's SELinux policy for apps targeting API 29+ refuses exec()
+        // on files in the app's own data directory (W^X: no process may run
+        // a file it is allowed to write). Everything the runtime downloads
+        // lands in filesDir/runtimes/prefix, so at targetSdk 29+ the shell
+        // this app installs can never be started — which is exactly why
+        // nothing executed in R1/R2. Termux pins 28 for the same reason.
+        //
+        // This costs nothing here: the manifest asks only for INTERNET and
+        // ACCESS_NETWORK_STATE, folders are picked through SAF rather than
+        // scoped storage, and releases are published on GitHub rather than
+        // the Play Store (which mandates a much newer targetSdk).
+        targetSdk 28
         versionCode 1
         versionName '1.0.0'
 

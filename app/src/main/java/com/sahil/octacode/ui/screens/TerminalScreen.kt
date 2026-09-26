@@ -1,34 +1,179 @@
 package com.sahil.octacode.ui.screens
 
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import com.sahil.octacode.core.shell.PrefixShell
+import com.sahil.octacode.core.shell.ShellResult
+import com.sahil.octacode.ui.components.StreamTerminal
+import com.sahil.octacode.ui.theme.NeonGreen
+import com.sahil.octacode.ui.theme.OnDarkMuted
+import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
 
 /**
- * No shell in this build.
+ * A real shell, now that the runtime it runs inside can actually execute.
  *
- * The runtime work downloaded and verified a prefix (R1/R2), but nothing
- * has been wired to execute inside it. The placeholder that used to sit
- * here promised "M5 (PTY + PRoot)" — M5 shipped as settings and history
- * instead, so that sentence had outlived the truth it described. A prompt
- * that accepted input and did nothing would be worse than an empty screen,
- * so this one simply states what is and is not running.
+ * The prefix was downloadable and verifiable from R1 onward, but starting a
+ * process in it is only possible because the app targets API 28 — see the
+ * note in app/build.gradle. Nothing here fakes a result: every command is
+ * echoed, its output appended verbatim, and a non-zero exit is reported as
+ * one. A runtime that has not been installed says so and offers the screen
+ * that installs it, rather than showing a prompt that would accept input and
+ * do nothing with it.
+ *
+ * Output ordering across the two streams is not preserved — stdout and stderr
+ * are read concurrently to avoid pipe deadlock, so a command writing to both
+ * will have its stderr collected after its stdout. The exit code is exact.
  */
 @Composable
-fun TerminalScreen() {
-    Box(Modifier.fillMaxSize().padding(20.dp), contentAlignment = Alignment.Center) {
-        Text(
-            text = "No shell in this build — the runtime prefix is downloaded " +
-                "and verified, but nothing executes inside it yet.",
-            style = MaterialTheme.typography.bodyMedium,
-            textAlign = TextAlign.Center,
+fun TerminalScreen(
+    onOpenRuntime: () -> Unit = {},
+    shell: PrefixShell = koinInject()
+) {
+    var input by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var lines by remember { mutableStateOf<List<String>>(emptyList()) }
+    val scope = rememberCoroutineScope()
+
+    // Recomputed on every composition rather than remembered: installing the
+    // runtime happens on another screen, and the state here must be true the
+    // moment the user navigates back.
+    val shellPath = shell.shellPath()
+    val installed = shellPath != null
+
+    fun submit() {
+        val command = input.trim()
+        if (command.isEmpty() || busy) return
+        input = ""
+        busy = true
+        lines = lines + "$ $command"
+        scope.launch {
+            val result = shell.run(command)
+            lines = lines + renderShellOutput(result)
+            busy = false
+        }
+    }
+
+    Column(Modifier.fillMaxSize().padding(20.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (installed) {
+                    "${shellPath?.name} · ready"
+                } else {
+                    "Runtime not installed"
+                },
+                style = MaterialTheme.typography.labelMedium,
+                fontFamily = FontFamily.Monospace,
+                color = if (installed) NeonGreen else OnDarkMuted
+            )
+            if (busy) {
+                Text(
+                    text = "running…",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = OnDarkMuted
+                )
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        StreamTerminal(
+            lines = lines,
+            modifier = Modifier.weight(1f),
+            emptyHint = if (installed) {
+                "Ready. Type a command below and press Run."
+            } else {
+                PrefixShell.NOT_INSTALLED_MESSAGE
+            },
+            // Give the terminal the height the screen is not using for input.
+            maxHeight = 4096.dp
         )
+
+        Spacer(Modifier.height(10.dp))
+
+        if (!installed) {
+            Button(
+                onClick = onOpenRuntime,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Open Runtime settings")
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = input,
+                    onValueChange = { input = it },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    label = { Text("Command") },
+                    enabled = !busy,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { submit() })
+                )
+                Button(
+                    onClick = { submit() },
+                    enabled = !busy && input.isNotBlank()
+                ) {
+                    Icon(Icons.Outlined.PlayArrow, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Run")
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Turn one [ShellResult] into display lines: real output first, then a single
+ * line recording the exit status when it is not a clean zero.
+ *
+ * A shell that never started (127) is deliberately not given an exit line —
+ * the message already states what is missing, and a bare "exit 127" would
+ * imply a process ran when none did.
+ */
+internal fun renderShellOutput(result: ShellResult): List<String> = buildList {
+    addAll(result.stdout.lines().dropLastWhile { it.isEmpty() })
+    addAll(result.stderr.lines().dropLastWhile { it.isEmpty() })
+    if (result.executed) {
+        when {
+            result.timedOut -> add("→ timed out")
+            result.exitCode != 0 -> add("→ exit ${result.exitCode}")
+        }
     }
 }

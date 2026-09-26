@@ -14,10 +14,13 @@ enum class RuntimeScope(val label: String) {
  * A place the agent can run.
  *
  * [blockedReason] is the honesty valve for controls that cannot work yet.
- * Android refuses to execute anything written to app-writable storage, so
- * until R3's jniLibs bootstrap lands no local runtime can actually start. A
- * screen therefore renders this sentence next to a disabled control instead of
- * a Start button that swallows the tap. `null` means the controls are live.
+ * The original reason — Android refusing to exec() anything written to
+ * app-writable storage — was removed by R3's targetSdk 28 pin, so a local
+ * runtime can now start. The field remains for whatever genuinely cannot:
+ * a remote scope with no endpoint, or a target that cannot honestly claim
+ * to be running. A screen renders this sentence next to a disabled control
+ * instead of a Start button that swallows the tap. `null` means the controls
+ * are live.
  *
  * [version] is nullable for the same reason [contextWindow] is: an unprobed
  * runtime has no version, and inventing one would be a lie in the UI.

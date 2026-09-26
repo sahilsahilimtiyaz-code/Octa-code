@@ -59,7 +59,11 @@ fun OctaNavGraph(
         composable(Routes.WORKSPACES) {
             WorkspacesScreen(onBack = { navController.popBackStack() })
         }
-        composable(Routes.TERMINAL) { TerminalScreen() }
+        composable(Routes.TERMINAL) {
+            // The not-installed state on this screen offers this route, so it
+            // has to actually lead somewhere that can install the runtime.
+            TerminalScreen(onOpenRuntime = { navController.navigate(Routes.RUNTIME) })
+        }
         composable(Routes.SETTINGS) {
             SettingsScreen(
                 onOpenAppearance = { navController.navigate(Routes.SETTINGS_APPEARANCE) },
