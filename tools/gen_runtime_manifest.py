@@ -35,6 +35,36 @@ INDEX_URL = (
 BASE_URL = "https://packages.termux.dev/apt/termux-main/"
 ARCH = "aarch64"
 
+# The one artifact that is not a Termux package.
+#
+# Termux builds every package against Android's bionic libc, so a prebuilt
+# Linux binary made for glibc (or musl) cannot execute in that prefix: there
+# is no ld-linux and no glibc anywhere in the mirror, and no combination of
+# its packages produces one. A glibc userland is the only way to run such a
+# tool, and PRoot — already pinned above — supplies it without root.
+#
+# `ubuntu-noble-oci` is the OCI "root" variant: a userspace with no kernel
+# and no bootloader, which is precisely what a PRoot rootfs wants.
+#
+# The pin was taken from Canonical's own SHA256SUMS for this release, and the
+# downloaded bytes were hashed to match it. build() re-checks the pin against
+# that published file on every run, so a mirror that drifts fails here rather
+# than on a user's device.
+GLIBC_ROOTFS = {
+    "id": "glibc-rootfs",
+    "version": "24.04-20260924",
+    "size": 29940736,
+    "sha256": "acce61eaff3142b0b21ae2beb39e6411d8359ddbd0fb188aca143aa14fd79e3d",
+    "path": "ubuntu-noble-oci-arm64-root.tar.gz",
+    "url": ("https://partner-images.canonical.com/oci/noble/20260924/"
+            "ubuntu-noble-oci-arm64-root.tar.gz"),
+    "kind": "ROOTFS",
+    "provides": [],
+}
+
+GLIBC_SUMS_URL = ("https://partner-images.canonical.com/oci/noble/20260924/"
+                  "SHA256SUMS")
+
 # id, title, description, seeds, optional
 GROUPS = [
     ("base", "Linux userland",
@@ -118,6 +148,32 @@ def closure(seeds: list[str], records: dict[str, dict[str, str]]) -> list[str]:
     return order
 
 
+def verify_glibc_pin() -> None:
+    """Fail loudly if our pin stops matching what the publisher publishes.
+
+    The tarball itself is 29 MB, so this only re-reads the small SHA256SUMS
+    file the publisher ships beside it. That is the whole point of pinning
+    from a named release: if the bytes behind that URL ever change, the app
+    must not be told they are the bytes we approved.
+    """
+    published = fetch(GLIBC_SUMS_URL)
+    name = GLIBC_ROOTFS["path"]
+    line = next(
+        (l for l in published.splitlines() if l.split()[-1].lstrip("*") == name),
+        None,
+    )
+    if line is None:
+        raise SystemExit(f"publisher's SHA256SUMS has no entry for {name}")
+    publisher_sum = line.split()[0].lower()
+    if publisher_sum != GLIBC_ROOTFS["sha256"]:
+        raise SystemExit(
+            f"glibc rootfs pin is stale\n"
+            f"  pinned:     {GLIBC_ROOTFS['sha256']}\n"
+            f"  published:  {publisher_sum}"
+        )
+    print(f"  glibc pin verified against {GLIBC_SUMS_URL}", file=sys.stderr)
+
+
 def build() -> dict:
     print(f"fetching {INDEX_URL}", file=sys.stderr)
     records = parse_index(fetch(INDEX_URL))
@@ -151,6 +207,24 @@ def build() -> dict:
         })
         print(f"  {gid:9s} {len(items):3d} pkgs {sum(i['size'] for i in items)/1e6:8.1f} MB",
               file=sys.stderr)
+
+    verify_glibc_pin()
+
+    groups.append({
+        "id": "glibc",
+        "title": "glibc userland",
+        "description": ("Ubuntu 24.04 arm64 root filesystem — lets prebuilt "
+                        "Linux binaries run, which the bionic Termux prefix "
+                        "cannot"),
+        # Opt-in on purpose. Nothing in the default runtime needs it, and
+        # putting 29 MB of Ubuntu behind a button nobody presses would be a
+        # download that does nothing for the person paying for it.
+        "optional": True,
+        "totalBytes": GLIBC_ROOTFS["size"],
+        "items": [dict(GLIBC_ROOTFS)],
+    })
+    print(f"  {'glibc':9s} {1:3d} pkg(s) {GLIBC_ROOTFS['size']/1e6:8.1f} MB",
+          file=sys.stderr)
 
     union = {i["id"]: i for g in groups for i in g["items"]}
     return {

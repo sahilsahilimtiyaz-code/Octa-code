@@ -167,4 +167,119 @@ class ArtifactInstallerTest {
         assertFalse(File(prefix, "bin/tool").exists())
         assertTrue("the cached, verified bytes are still proven good", ledger.contains("tool"))
     }
+
+    // --- R4: a glibc root filesystem --------------------------------------
+    //
+    // Not a package. Its paths are already the ones the filesystem will have,
+    // and it must land somewhere of its own: the prefix is a bionic userland
+    // and merging the two leaves binaries bound to the wrong loader.
+
+    private fun rootfsArtifact(id: String, bytes: ByteArray) = RuntimeArtifact(
+        id = id,
+        version = "1.0",
+        size = bytes.size.toLong(),
+        sha256 = MessageDigest.getInstance("SHA-256").digest(bytes)
+            .joinToString("") { "%02x".format(it) },
+        path = "ubuntu-noble-oci-arm64-root.tar.gz",
+        url = "https://partner-images.canonical.com/oci/noble/20260924/" +
+            "ubuntu-noble-oci-arm64-root.tar.gz",
+        kind = RuntimeArtifact.Kind.ROOTFS
+    )
+
+    @Test
+    fun `a root filesystem unpacks beside the prefix, never inside it`() {
+        val bytes = DebFixtures.rootfsTgz(
+            "usr/bin/bash" to "ELF",
+            "etc/os-release" to "NAME=Ubuntu"
+        )
+        val art = rootfsArtifact("glibc-rootfs", bytes)
+        ledger.markVerified(art)
+
+        val result = installer.install(art, cached("glibc-rootfs", bytes))
+
+        assertTrue("got $result", result is InstallResult.Installed)
+        val root = installer.rootfsRoot
+        assertEquals("ELF", File(root, "usr/bin/bash").readText())
+        assertEquals("NAME=Ubuntu", File(root, "etc/os-release").readText())
+        // The whole point of the sibling directory. A bionic prefix with a
+        // glibc /usr inside it is a userland that is neither.
+        assertFalse("must not land in the prefix", File(prefix, "usr/bin/bash").exists())
+        assertFalse("rootfs must be a sibling of the prefix", root == prefix)
+    }
+
+    @Test
+    fun `the record names top level entries only, and that is enough to remove it`() {
+        val bytes = DebFixtures.rootfsTgz(
+            "usr/bin/bash" to "ELF",
+            "usr/bin/dash" to "ELF",
+            "etc/os-release" to "NAME=Ubuntu"
+        )
+        val art = rootfsArtifact("glibc-rootfs", bytes)
+        ledger.markVerified(art)
+        installer.install(art, cached("glibc-rootfs", bytes))
+
+        val record = requireNotNull(ledger.get("glibc-rootfs"))
+        assertTrue(record.isInstalled)
+        // The ledger claims "this app put these here". Naming all three paths
+        // says the same thing at a size that grows with every image; the
+        // top level is the honest summary, and removal recurses either way.
+        assertEquals(listOf("etc", "usr"), record.installedFiles.sorted())
+    }
+
+    @Test
+    fun `a root filesystem with nothing in it is refused, not recorded`() {
+        val bytes = DebFixtures.gzip(DebFixtures.tar(emptyList()))
+        val art = rootfsArtifact("glibc-rootfs", bytes)
+        ledger.markVerified(art)
+
+        val result = installer.install(art, cached("glibc-rootfs", bytes))
+
+        assertTrue("got $result", result is InstallResult.Failed)
+        assertTrue(
+            "reason was: ${(result as InstallResult.Failed).reason}",
+            result.reason.contains("no filesystem")
+        )
+        // Nothing unpacked means nothing claimed — otherwise the runner would
+        // report a glibc userland that is not there.
+        assertFalse(requireNotNull(ledger.get("glibc-rootfs")).isInstalled)
+        assertFalse(installer.rootfsRoot.exists())
+    }
+
+    @Test
+    fun `reinstalling replaces the tree rather than merging into the old one`() {
+        val first = DebFixtures.rootfsTgz("usr/bin/bash" to "OLD", "stale/file" to "gone")
+        val art = rootfsArtifact("glibc-rootfs", first)
+        ledger.markVerified(art)
+        installer.install(art, cached("glibc-rootfs", first))
+        assertTrue(File(installer.rootfsRoot, "stale/file").isFile)
+
+        val second = DebFixtures.rootfsTgz("usr/bin/bash" to "NEW")
+        ledger.markUninstalled("glibc-rootfs")
+        val reinstalled = rootfsArtifact("glibc-rootfs", second)
+        ledger.markVerified(reinstalled)
+        installer.install(reinstalled, cached("glibc-rootfs2", second))
+
+        assertEquals("NEW", File(installer.rootfsRoot, "usr/bin/bash").readText())
+        // An upgraded image that kept the old file would be a tree assembled
+        // from two different releases, which is not a version of anything.
+        assertFalse(
+            "a file from the previous image survived",
+            File(installer.rootfsRoot, "stale/file").exists()
+        )
+    }
+
+    @Test
+    fun `unverified rootfs bytes are refused exactly as a package would be`() {
+        val bytes = DebFixtures.rootfsTgz("usr/bin/bash" to "ELF")
+        val art = rootfsArtifact("glibc-rootfs", bytes)
+        // No markVerified: this is the case where the bytes came from somewhere
+        // the app did not check.
+        val result = installer.install(art, cached("glibc-rootfs", bytes))
+
+        assertTrue("got $result", result is InstallResult.Failed)
+        assertTrue(
+            "reason was: ${(result as InstallResult.Failed).reason}",
+            result.reason.contains("no verification record")
+        )
+    }
 }

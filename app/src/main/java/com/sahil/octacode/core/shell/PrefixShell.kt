@@ -2,9 +2,7 @@ package com.sahil.octacode.core.shell
 
 import com.sahil.octacode.core.runtime.RuntimeIndex
 import java.io.File
-import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 
 /**
@@ -118,46 +116,12 @@ class PrefixShell(
             home.mkdirs()
             File(home, "tmp").mkdirs()
 
-            val builder = ProcessBuilder(listOf(shell.absolutePath, "-c", command))
-                .directory(home)
-            builder.environment().putAll(environment())
-
-            val process = try {
-                builder.start()
-            } catch (e: Exception) {
-                return@withContext ShellResult(
-                    command = command,
-                    binary = shell.absolutePath,
-                    exitCode = ShellResult.EXIT_SPAWN_FAILED,
-                    stdout = "",
-                    stderr = e.message?.takeIf { it.isNotBlank() }
-                        ?: "could not start ${shell.name}"
-                )
-            }
-
-            val out = async { process.inputStream.bufferedReader().use { it.readText() } }
-            val err = async { process.errorStream.bufferedReader().use { it.readText() } }
-
-            if (!process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)) {
-                process.destroyForcibly()
-                // The killed process's readers return once the pipes close;
-                // keep whatever it printed rather than discarding it.
-                return@withContext ShellResult(
-                    command = command,
-                    binary = shell.absolutePath,
-                    exitCode = ShellResult.EXIT_TIMEOUT,
-                    stdout = runCatching { out.await() }.getOrDefault(""),
-                    stderr = runCatching { err.await() }.getOrDefault(""),
-                    timedOut = true
-                )
-            }
-
-            ShellResult(
+            ProcessRunner.run(
                 command = command,
-                binary = shell.absolutePath,
-                exitCode = process.exitValue(),
-                stdout = out.await(),
-                stderr = err.await()
+                argv = listOf(shell.absolutePath, "-c", command),
+                directory = home,
+                environment = environment(),
+                timeoutMs = timeoutMs
             )
         }
 

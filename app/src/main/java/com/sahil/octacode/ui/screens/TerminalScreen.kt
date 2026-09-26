@@ -14,6 +14,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -30,12 +31,26 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.sahil.octacode.core.shell.PrefixShell
+import com.sahil.octacode.core.shell.ProotRunner
 import com.sahil.octacode.core.shell.ShellResult
 import com.sahil.octacode.ui.components.StreamTerminal
 import com.sahil.octacode.ui.theme.NeonGreen
 import com.sahil.octacode.ui.theme.OnDarkMuted
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
+
+/**
+ * Which userland a command runs in.
+ *
+ * Two, because they are genuinely different systems rather than two skins:
+ * the Termux prefix is bionic, the glibc root is not, and a binary built for
+ * one will not run in the other. Offering both is honest; pretending they
+ * were interchangeable is what produces "works on my phone".
+ */
+enum class ShellTarget(val title: String) {
+    TERMUX("Termux"),
+    GLIBC("glibc")
+}
 
 /**
  * A real shell, now that the runtime it runs inside can actually execute.
@@ -55,18 +70,34 @@ import org.koin.compose.koinInject
 @Composable
 fun TerminalScreen(
     onOpenRuntime: () -> Unit = {},
-    shell: PrefixShell = koinInject()
+    shell: PrefixShell = koinInject(),
+    proot: ProotRunner = koinInject(),
 ) {
     var input by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var lines by remember { mutableStateOf<List<String>>(emptyList()) }
+    var target by remember { mutableStateOf(ShellTarget.TERMUX) }
     val scope = rememberCoroutineScope()
 
     // Recomputed on every composition rather than remembered: installing the
     // runtime happens on another screen, and the state here must be true the
     // moment the user navigates back.
     val shellPath = shell.shellPath()
-    val installed = shellPath != null
+    val glibcReady = proot.isInstalled()
+
+    // Readiness is a property of the *selected* userland, not of the terminal.
+    // A glibc prefix that is not installed does not make the Termux one stop
+    // working, so the check follows the selection.
+    val installed = when (target) {
+        ShellTarget.TERMUX -> shellPath != null
+        ShellTarget.GLIBC -> glibcReady
+    }
+    val notInstalledMessage = when (target) {
+        ShellTarget.TERMUX -> PrefixShell.NOT_INSTALLED_MESSAGE
+        ShellTarget.GLIBC ->
+            if (proot.prootPath() == null) ProotRunner.PROOT_MISSING_MESSAGE
+            else ProotRunner.ROOTFS_MISSING_MESSAGE
+    }
 
     fun submit() {
         val command = input.trim()
@@ -75,7 +106,10 @@ fun TerminalScreen(
         busy = true
         lines = lines + "$ $command"
         scope.launch {
-            val result = shell.run(command)
+            val result = when (target) {
+                ShellTarget.TERMUX -> shell.run(command)
+                ShellTarget.GLIBC -> proot.run(command)
+            }
             lines = lines + renderShellOutput(result)
             busy = false
         }
@@ -89,7 +123,10 @@ fun TerminalScreen(
         ) {
             Text(
                 text = if (installed) {
-                    "${shellPath?.name} · ready"
+                    when (target) {
+                        ShellTarget.TERMUX -> "${shellPath?.name} · ready"
+                        ShellTarget.GLIBC -> "glibc · ready"
+                    }
                 } else {
                     "Runtime not installed"
                 },
@@ -109,13 +146,43 @@ fun TerminalScreen(
 
         Spacer(Modifier.height(8.dp))
 
+        // Both chips are always enabled. Hiding the glibc one until it is
+        // installed would make the second userland undiscoverable, and the
+        // message it carries is the install instruction.
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            ShellTarget.entries.forEach { option ->
+                val ready = when (option) {
+                    ShellTarget.TERMUX -> shellPath != null
+                    ShellTarget.GLIBC -> glibcReady
+                }
+                FilterChip(
+                    selected = target == option,
+                    onClick = { target = option },
+                    // The trailing mark is the honest part: a userland you can
+                    // pick but not yet run would be a row that silently does
+                    // nothing, which is the one thing this app does not ship.
+                    label = {
+                        Text(
+                            if (ready) option.title else "${option.title} · not installed",
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                )
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
         StreamTerminal(
             lines = lines,
             modifier = Modifier.weight(1f),
             emptyHint = if (installed) {
                 "Ready. Type a command below and press Run."
             } else {
-                PrefixShell.NOT_INSTALLED_MESSAGE
+                notInstalledMessage
             },
             // Give the terminal the height the screen is not using for input.
             maxHeight = 4096.dp

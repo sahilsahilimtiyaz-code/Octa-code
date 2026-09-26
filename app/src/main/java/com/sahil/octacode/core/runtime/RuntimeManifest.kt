@@ -9,8 +9,9 @@ import kotlinx.serialization.json.Json
  *
  * Every artifact carries the SHA-256 of the exact bytes it will receive, so the app
  * can never execute (or later unpack) a stream it did not verify. Pins are produced
- * by tools/gen_runtime_manifest.py from the live Termux apt index — that script is
- * the provenance for every URL/hash below.
+ * by tools/gen_runtime_manifest.py — that script is the provenance for every URL and
+ * hash below, and it re-checks each pin against its publisher's own checksum file
+ * when it runs.
  *
  * The manifest ships INSIDE the APK. Nothing about what gets downloaded is fetched
  * from the network, so a compromised mirror cannot widen the trust boundary.
@@ -22,10 +23,40 @@ data class RuntimeArtifact(
     val size: Long,
     val sha256: String,
     val path: String,
-    val provides: List<String> = emptyList()
+    val provides: List<String> = emptyList(),
+    /**
+     * Absolute URL for an artifact that does not come from [RuntimeManifest.baseUrl].
+     * Null means baseUrl + [path], which is every Termux package.
+     *
+     * The glibc root filesystem states its own URL for the same reason it states
+     * its own hash: it is fetched from Canonical, not from the pinned Termux
+     * mirror, and pretending otherwise would either 404 or quietly start pulling
+     * Ubuntu from a host nobody chose.
+     */
+    val url: String? = null,
+    /** What these bytes are, which is what decides how they are unpacked. */
+    val kind: Kind = Kind.DEB
 ) {
+    /** A Termux package to unwrap into the prefix, or a complete root filesystem. */
+    enum class Kind { DEB, ROOTFS }
+
     /** Local filename used in the on-device cache (versioned → upgrades don't collide). */
-    val cacheName: String get() = "${id}_${version}.deb"
+    val cacheName: String get() = "${id}_${version}.$extension"
+
+    /**
+     * Container suffix, read from the path instead of assumed.
+     *
+     * A hardcoded ".deb" would name a 29 MB gzipped root filesystem
+     * "glibc-rootfs_<version>.deb". Nothing collides with that today, which is
+     * exactly why it would survive review and then mislead whoever reads the
+     * cache directory after that.
+     */
+    private val extension: String
+        get() = when {
+            path.endsWith(".tar.gz", ignoreCase = true) -> "tar.gz"
+            path.endsWith(".tar.xz", ignoreCase = true) -> "tar.xz"
+            else -> path.substringAfterLast('.', "deb").ifBlank { "deb" }
+        }
 
     /** Commands this package will make available once unpacked (plus its own id). */
     val commandNames: List<String> get() = (listOf(id) + provides).distinct()
@@ -64,11 +95,25 @@ data class RuntimeManifest(
     fun group(id: String): RuntimeGroup? = groups.firstOrNull { it.id == id }
 
     fun urlFor(artifact: RuntimeArtifact): String =
-        baseUrl.trimEnd('/') + "/" + artifact.path.trimStart('/')
+        artifact.url ?: baseUrl.trimEnd('/') + "/" + artifact.path.trimStart('/')
 
     /** All artifacts, deduped by package id (group closures overlap by design). */
     fun distinctArtifacts(): List<RuntimeArtifact> =
         groups.flatMap { it.items }.distinctBy { it.id }
+
+    /**
+     * Exactly what the one-tap install downloads: every non-optional group,
+     * counted once.
+     *
+     * Kept apart from [distinctArtifacts] because the two answer different
+     * questions. This is "what will the Install everything button fetch";
+     * that is "everything this build knows how to pin". Quoting the second
+     * while doing the first would charge the user for 29 MB of glibc root
+     * filesystem the button then quietly skips — the app would be pricing
+     * work it does not do.
+     */
+    fun defaultArtifacts(): List<RuntimeArtifact> =
+        groups.filterNot { it.optional }.flatMap { it.items }.distinctBy { it.id }
 
     /** True when the manifest targets this device (arm64-only by policy). */
     fun supportsDevice(deviceAbi: String): Boolean =

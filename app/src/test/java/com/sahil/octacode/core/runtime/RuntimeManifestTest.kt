@@ -37,11 +37,39 @@ class RuntimeManifestTest {
         manifest.distinctArtifacts().forEach { artifact ->
             assertTrue("${artifact.id}: bad sha256 '${artifact.sha256}'", pins.matches(artifact.sha256))
             assertTrue("${artifact.id}: size must be > 0", artifact.size > 0)
-            assertTrue("${artifact.id}: not a deb path", artifact.path.endsWith(".deb"))
-            assertTrue("${artifact.id}: path must stay under pool/", artifact.path.startsWith("pool/"))
         }
         assertEquals(manifest.packageCount, manifest.distinctArtifacts().size)
         assertTrue(manifest.unionBytes > 0)
+    }
+
+    @Test
+    fun `a deb comes from the pinned mirror and a rootfs names its own host`() {
+        // Two rules, because there are two sources. A .deb resolved against the
+        // Termux base URL is the pinning story working. A ROOTFS that did the
+        // same would be asking Canonical's path of packages.termux.dev, which
+        // does not exist — and "it 404s" is not a check.
+        manifest.distinctArtifacts().forEach { artifact ->
+            when (artifact.kind) {
+                RuntimeArtifact.Kind.DEB -> {
+                    assertTrue(
+                        "${artifact.id}: a deb must come from the mirror, not name a url",
+                        artifact.url == null
+                    )
+                    assertTrue("${artifact.id}: not a deb path", artifact.path.endsWith(".deb"))
+                    assertTrue("${artifact.id}: path must stay under pool/", artifact.path.startsWith("pool/"))
+                }
+                RuntimeArtifact.Kind.ROOTFS -> {
+                    val url = artifact.url
+                    assertTrue("${artifact.id}: a rootfs must name its own url", url != null)
+                    assertTrue("${artifact.id}: rootfs url must be https", url!!.startsWith("https://"))
+                    assertTrue(
+                        "${artifact.id}: rootfs must not be built from the Termux base",
+                        !url.startsWith(manifest.baseUrl)
+                    )
+                    assertTrue("${artifact.id}: rootfs must be a tarball", artifact.path.endsWith(".tar.gz"))
+                }
+            }
+        }
     }
 
     @Test
@@ -54,9 +82,32 @@ class RuntimeManifestTest {
     }
 
     @Test
+    fun `the rootfs url is its own, not the mirror plus a path`() {
+        val rootfs = manifest.group("glibc")!!.items.single()
+        assertEquals(rootfs.url, manifest.urlFor(rootfs))
+        assertFalse(
+            "must not be resolved against the Termux mirror",
+            manifest.urlFor(rootfs).startsWith(manifest.baseUrl)
+        )
+    }
+
+    @Test
+    fun `the cache name says what the file actually is`() {
+        // A gzipped rootfs stored as "….deb" collides with nothing today and
+        // misleads whoever reads the cache directory after that.
+        val rootfs = manifest.group("glibc")!!.items.single()
+        assertEquals("glibc-rootfs_${rootfs.version}.tar.gz", rootfs.cacheName)
+        manifest.distinctArtifacts()
+            .filter { it.kind == RuntimeArtifact.Kind.DEB }
+            .forEach { assertTrue("${it.id}: ${it.cacheName}", it.cacheName.endsWith(".deb")) }
+    }
+
+    @Test
     fun `groups cover the requested runtime with self contained closures`() {
-        assertEquals(listOf("base", "proot", "node", "python", "devtools", "rust"),
-            manifest.groups.map { it.id })
+        assertEquals(
+            listOf("base", "proot", "node", "python", "devtools", "rust", "glibc"),
+            manifest.groups.map { it.id }
+        )
 
         // Seeds the user asked for must be present in their own group.
         assertTrue(manifest.group("base")!!.items.any { it.id == "bash" })
@@ -64,17 +115,30 @@ class RuntimeManifestTest {
         assertTrue(manifest.group("node")!!.items.any { it.id == "nodejs-lts" })
         assertTrue(manifest.group("python")!!.items.any { it.id == "python" })
         assertTrue(manifest.group("devtools")!!.items.any { it.id == "git" })
+        assertTrue(manifest.group("glibc")!!.items.any { it.id == "glibc-rootfs" })
 
-        // No group is opt-in: Rust was promoted into the default install set,
-        // so every group is fetched by the full-runtime action.
+        // Every group but the glibc root filesystem is part of the default
+        // install. Rust was promoted in, so "optional" now has to mean
+        // something: the glibc userland is 29 MB that nothing in the default
+        // runtime needs, and it is opt-in rather than quietly added to the
+        // one-tap button's bill.
         assertEquals(
-            listOf(false, false, false, false, false, false),
+            listOf(false, false, false, false, false, false, true),
             manifest.groups.map { it.optional }
         )
-        assertTrue(
-            "union size was ${manifest.unionBytes}",
-            manifest.unionBytes in 260_000_000L..270_000_000L
-        )
+    }
+
+    @Test
+    fun `the default install is quoted without the optional group`() {
+        val glibc = manifest.group("glibc")!!
+        val defaults = manifest.defaultArtifacts()
+
+        assertFalse("the glibc rootfs must not be in the default set", defaults.any { it.id == "glibc-rootfs" })
+        // Everything that is not optional is, and the two sets differ by
+        // exactly the optional artifacts.
+        val optionalOnly = manifest.distinctArtifacts().map { it.id } - defaults.map { it.id }
+        assertEquals(setOf("glibc-rootfs"), optionalOnly.toSet())
+        assertTrue("the glibc group is not free: ${glibc.totalBytes}", glibc.totalBytes > 0)
     }
 
     @Test
@@ -98,5 +162,21 @@ class RuntimeManifestTest {
         assertTrue(manifest.supportsDevice("arm64-v8a"))
         assertFalse(manifest.supportsDevice("armeabi-v7a"))
         assertTrue("unknown ABI should not hard-block", manifest.supportsDevice(""))
+    }
+
+    @Test
+    fun `the glibc rootfs is a real linux userland, not a stub`() {
+        // The manifest alone cannot say whether the image is usable, so this
+        // only asserts the two things the manifest can know: it is an arm64
+        // Ubuntu root, and it is a rootfs kind the installer will unpack
+        // somewhere other than the bionic prefix.
+        val rootfs = manifest.group("glibc")!!.items.single()
+        assertEquals(RuntimeArtifact.Kind.ROOTFS, rootfs.kind)
+        assertEquals("aarch64", manifest.arch)
+        assertEquals("24.04-20260924", rootfs.version)
+        // Sharing a cache filename with a package would let one artifact's
+        // bytes be installed as the other.
+        val names = manifest.distinctArtifacts().map { it.cacheName }
+        assertEquals(names.size, names.distinct().size)
     }
 }

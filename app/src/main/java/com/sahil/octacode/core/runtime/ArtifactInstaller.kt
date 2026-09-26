@@ -2,8 +2,11 @@ package com.sahil.octacode.core.runtime
 
 import com.sahil.octacode.core.runtime.extract.DebExtractor
 import com.sahil.octacode.core.runtime.extract.ExtractResult
+import com.sahil.octacode.core.runtime.extract.PathMapping
+import com.sahil.octacode.core.runtime.extract.TarExtractor
 import java.io.File
 import java.nio.file.Files
+import java.util.zip.GZIPInputStream
 
 sealed interface InstallResult {
     data class Installed(val files: Int, val skipped: Int, val bytesWritten: Long) : InstallResult
@@ -30,6 +33,16 @@ class ArtifactInstaller(
 ) {
     private val stagingRoot: File get() = File(prefix.parentFile, "staging")
 
+    /**
+     * Where the glibc root filesystem lives.
+     *
+     * A sibling of the prefix, never inside it: both trees carry `bin`, `lib`
+     * and `usr`, and merging a bionic userland with a glibc one leaves
+     * something that is neither — binaries bound to the wrong loader, and
+     * libraries that resolve each other in an order nobody chose.
+     */
+    val rootfsRoot: File get() = File(prefix.parentFile, "rootfs")
+
     fun install(artifact: RuntimeArtifact, deb: File): InstallResult {
         val record = ledger.get(artifact.id)
             ?: return InstallResult.Failed(
@@ -39,6 +52,7 @@ class ArtifactInstaller(
         if (!deb.isFile) {
             return InstallResult.Failed("verified bytes for ${artifact.id} are missing from the cache")
         }
+        if (artifact.kind == RuntimeArtifact.Kind.ROOTFS) return installRootfs(artifact, deb)
 
         val staging = File(stagingRoot, artifact.id)
         staging.deleteRecursively()
@@ -79,6 +93,96 @@ class ArtifactInstaller(
             )
         }
     }
+
+    /**
+     * A root filesystem is not a package.
+     *
+     * Its entries are already the paths it will have on disk (`usr/bin/bash`),
+     * so there is no Termux prefix to strip and nothing to relocate — but the
+     * whole tree is only usable if all of it arrived, and a half-unpacked
+     * Ubuntu is worse than none: it would start, answer some commands and fail
+     * on the rest, which is the least honest state of all. So it is extracted
+     * to staging and swapped in whole, and the ledger record is written only
+     * after that swap succeeded.
+     */
+    private fun installRootfs(artifact: RuntimeArtifact, archive: File): InstallResult {
+        val staging = File(stagingRoot, artifact.id)
+        staging.deleteRecursively()
+        staging.mkdirs()
+
+        val extracted = try {
+            GZIPInputStream(archive.inputStream().buffered()).use { gunzipped ->
+                TarExtractor.extract(
+                    gunzipped, staging, rootfsSafetyCap(archive.length()), ::rootfsPath
+                )
+            }
+        } catch (e: Exception) {
+            staging.deleteRecursively()
+            return InstallResult.Failed(
+                "Unpacking ${artifact.id} ${artifact.version} — ${e.message ?: "unknown error"}"
+            )
+        }
+
+        if (extracted.isEmpty) {
+            staging.deleteRecursively()
+            return InstallResult.Failed(
+                "${artifact.id} ${artifact.version} contained no filesystem — unexpected image layout"
+            )
+        }
+
+        // Top-level entries only. The ledger claims "this app put these here";
+        // naming all 3400 of them says the same thing at a hundred times the
+        // size, and removal recurses either way.
+        val topLevel = extracted.files
+            .map { it.substringBefore('/') }
+            .filter { it.isNotEmpty() }
+            .distinct()
+
+        return try {
+            if (rootfsRoot.exists() && !rootfsRoot.deleteRecursively()) {
+                // An if-expression rather than an early return: returning out
+                // of the middle of a try block that is itself the return value
+                // is legal but hard to read, and this file has one such
+                // pattern already.
+                InstallResult.Failed(
+                    "Could not clear the previous ${artifact.id}. Remove it and try again — " +
+                        "the verified bytes are still cached."
+                )
+            } else {
+                if (!staging.renameTo(rootfsRoot)) {
+                    // renameTo fails across some filesystems; copying is slower
+                    // but produces the same tree.
+                    staging.copyRecursively(rootfsRoot, overwrite = true)
+                }
+                ledger.markInstalled(artifact.id, topLevel, extracted.skipped)
+                staging.deleteRecursively()
+                InstallResult.Installed(topLevel.size, extracted.skipped, extracted.bytesWritten)
+            }
+        } catch (e: Exception) {
+            InstallResult.Failed(
+                "Installing ${artifact.id} — ${e.message ?: "unknown error"}. " +
+                    "The verified bytes stay cached, so retrying re-unpacks without re-downloading."
+            )
+        }
+    }
+
+    /**
+     * Where one archive entry belongs in a root filesystem.
+     *
+     * The paths are already final, so this is nearly a no-op — but it is a
+     * no-op *on purpose*, written in one readable place rather than implied by
+     * an inline lambda. Traversal and symlink escapes are TarExtractor's job
+     * and it checks every entry, root filesystem or package.
+     */
+    private fun rootfsPath(path: String): PathMapping {
+        val cleaned = path.removePrefix("./").removePrefix("/").trimEnd('/')
+        return if (cleaned.isEmpty() || cleaned == ".") PathMapping.Ignore
+        else PathMapping.Place(cleaned)
+    }
+
+    /** An Ubuntu OCI root unpacks to roughly 3.5x; this caps a hostile one. */
+    private fun rootfsSafetyCap(compressedBytes: Long): Long =
+        maxOf(512L * 1024 * 1024, compressedBytes * 16)
 
     /**
      * Fills [moved] as it goes rather than at the end, so a failure partway

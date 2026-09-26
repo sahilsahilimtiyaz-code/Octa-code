@@ -94,7 +94,8 @@ fun RuntimeScreen(
             InfoLine("Mirror", manifest.baseUrl)
             InfoLine("Index", manifest.index)
             InfoLine("Architecture", "${manifest.arch} · ${manifest.abi}")
-            InfoLine("Pinned", "${manifest.packageCount} artifacts · ${formatBytes(manifest.unionBytes)}")
+            InfoLine("Pinned", "${manifest.packageCount} artifacts · ${formatBytes(manifest.unionBytes)} · "
+                + "including optional groups")
             InfoLine("Manifest", "generated ${manifest.generated} · schema v${manifest.schema}")
             InfoLine(
                 "Stored",
@@ -112,19 +113,26 @@ fun RuntimeScreen(
 
         val totalPending = state.pendingBytes(manifest)
         val runtimeComplete = state.isComplete(manifest)
-        val runtimeInstalled = manifest.distinctArtifacts().all { state.isInstalled(it.id) }
+        // The default set, not the whole manifest: the glibc root filesystem is
+        // pinned and installable but is not part of what this button fetches,
+        // so counting it here would report the runtime as permanently
+        // incomplete after the install the user actually asked for.
+        val defaultArtifacts = manifest.defaultArtifacts()
+        val defaultCount = defaultArtifacts.size
+        val defaultBytes = defaultArtifacts.sumOf { it.size }
+        val runtimeInstalled = defaultArtifacts.all { state.isInstalled(it.id) }
 
         GlassPanel(title = "Default install") {
             Text(
                 when {
                     runtimeInstalled ->
-                        "Full runtime unpacked — ${manifest.packageCount} artifacts, " +
-                            formatBytes(manifest.unionBytes)
+                        "Full runtime unpacked — $defaultCount artifacts, " +
+                            formatBytes(defaultBytes)
                     runtimeComplete ->
-                        "All ${manifest.packageCount} artifacts verified; unpacking still pending"
+                        "All $defaultCount artifacts verified; unpacking still pending"
                     else ->
-                        "${formatBytes(totalPending)} of ${formatBytes(manifest.unionBytes)} remaining · " +
-                            "${state.pendingCount(manifest)} of ${manifest.packageCount} artifacts"
+                        "${formatBytes(totalPending)} of ${formatBytes(defaultBytes)} remaining · " +
+                            "${state.pendingCount(manifest)} of $defaultCount artifacts"
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant

@@ -63,13 +63,18 @@ data class ProvisionerState(
 
     /**
      * Cost of installing EVERYTHING still missing, counting packages shared
-     * between group closures once — this is what the full-install button charges.
+     * between group closures once — this is what the full-install button
+     * charges.
+     *
+     * Scoped to [RuntimeManifest.defaultArtifacts], not to every artifact the
+     * manifest pins: this number is a quote for a specific button, and the
+     * button skips optional groups.
      */
     fun pendingBytes(manifest: RuntimeManifest): Long =
-        manifest.distinctArtifacts().filterNot { fetched.containsKey(it.id) }.sumOf { it.size }
+        manifest.defaultArtifacts().filterNot { fetched.containsKey(it.id) }.sumOf { it.size }
 
     fun pendingCount(manifest: RuntimeManifest): Int =
-        manifest.distinctArtifacts().count { !fetched.containsKey(it.id) }
+        manifest.defaultArtifacts().count { !fetched.containsKey(it.id) }
 
     fun isComplete(manifest: RuntimeManifest): Boolean = pendingCount(manifest) == 0
 }

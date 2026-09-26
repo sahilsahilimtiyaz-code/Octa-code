@@ -8,6 +8,7 @@ import com.sahil.octacode.core.runtime.RuntimeLedger
 import com.sahil.octacode.core.runtime.RuntimeManifest
 import com.sahil.octacode.core.runtime.RuntimeProvisioner
 import com.sahil.octacode.core.shell.PrefixShell
+import com.sahil.octacode.core.shell.ProotRunner
 import com.sahil.octacode.data.net.KtorHttpFactory
 import java.io.File
 import org.koin.android.ext.koin.androidContext
@@ -37,6 +38,19 @@ val runtimeModule = module {
     // home directory, and so a shell never writes into unpacked package files.
     single {
         PrefixShell(
+            prefix = File(androidContext().filesDir, "runtimes/prefix"),
+            home = File(androidContext().filesDir, "home"),
+            index = get()
+        )
+    }
+
+    // R4: PRoot plus a glibc root filesystem, so a prebuilt Linux binary can
+    // run at all — the Termux prefix is bionic and cannot load one. Same home
+    // as the Termux shell on purpose: a file written in either is one file, not
+    // two trees that quietly diverge.
+    single {
+        ProotRunner(
+            rootfs = File(androidContext().filesDir, "runtimes/rootfs"),
             prefix = File(androidContext().filesDir, "runtimes/prefix"),
             home = File(androidContext().filesDir, "home"),
             index = get()

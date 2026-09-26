@@ -1,6 +1,7 @@
 package com.sahil.octacode.core.runtime
 
 import java.io.ByteArrayOutputStream
+import java.util.zip.GZIPOutputStream
 import org.tukaani.xz.LZMA2Options
 import org.tukaani.xz.XZOutputStream
 
@@ -45,6 +46,23 @@ object DebFixtures {
     /** A `.deb` whose payload paths are relative to the Termux prefix. */
     fun debOf(vararg relativePaths: Pair<String, String>): ByteArray =
         deb(relativePaths.map { Entry.file(PREFIX + it.first, it.second) })
+
+    /**
+     * A gzipped tar laid out the way an Ubuntu OCI root image is: paths that
+     * are already the ones the filesystem will have, with no package prefix.
+     *
+     * The same [tar] writer serves both, which is the point — the root
+     * filesystem is unpacked by the same reader, and a test that built its
+     * archive some other way would not be exercising that reader.
+     */
+    fun rootfsTgz(vararg relativePaths: Pair<String, String>): ByteArray =
+        gzip(tar(relativePaths.map { Entry.file(it.first, it.second) }))
+
+    fun gzip(payload: ByteArray): ByteArray {
+        val out = ByteArrayOutputStream()
+        GZIPOutputStream(out).use { it.write(payload) }
+        return out.toByteArray()
+    }
 
     fun xz(payload: ByteArray): ByteArray {
         val out = ByteArrayOutputStream()

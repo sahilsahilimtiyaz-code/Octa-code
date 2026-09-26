@@ -5,14 +5,14 @@
   "abi": "arm64-v8a",
   "index": "https://packages.termux.dev/apt/termux-main/dists/stable/main/binary-aarch64/Packages",
   "baseUrl": "https://packages.termux.dev/apt/termux-main/",
-  "generated": "2026-09-25",
+  "generated": "2026-09-26",
   "groups": [
     {
       "id": "base",
       "title": "Linux userland",
       "description": "bash, coreutils, tar, find, sed + Termux core",
       "optional": false,
-      "totalBytes": 14764452,
+      "totalBytes": 14762976,
       "items": [
         {
           "id": "bash",
@@ -176,10 +176,10 @@
         },
         {
           "id": "termux-am",
-          "version": "0.8.0-2",
-          "size": 577260,
-          "sha256": "c67200a3c1750819e0aef91be6f166395b61be7f7b2e1437a7294643956f5d32",
-          "path": "pool/main/t/termux-am/termux-am_0.8.0-2_all.deb",
+          "version": "0.8.1",
+          "size": 575784,
+          "sha256": "ee7eed85ec45fbccc6f462578f0d40f5899422fe202d1d68942334a018364cba",
+          "path": "pool/main/t/termux-am/termux-am_0.8.1_all.deb",
           "provides": []
         },
         {
@@ -674,7 +674,7 @@
       "title": "Dev tools",
       "description": "git, ripgrep, fd, fzf, curl",
       "optional": false,
-      "totalBytes": 23215176,
+      "totalBytes": 23213700,
       "items": [
         {
           "id": "git",
@@ -958,10 +958,10 @@
         },
         {
           "id": "termux-am",
-          "version": "0.8.0-2",
-          "size": 577260,
-          "sha256": "c67200a3c1750819e0aef91be6f166395b61be7f7b2e1437a7294643956f5d32",
-          "path": "pool/main/t/termux-am/termux-am_0.8.0-2_all.deb",
+          "version": "0.8.1",
+          "size": 575784,
+          "sha256": "ee7eed85ec45fbccc6f462578f0d40f5899422fe202d1d68942334a018364cba",
+          "path": "pool/main/t/termux-am/termux-am_0.8.1_all.deb",
           "provides": []
         },
         {
@@ -1280,8 +1280,27 @@
           "provides": []
         }
       ]
+    },
+    {
+      "id": "glibc",
+      "title": "glibc userland",
+      "description": "Ubuntu 24.04 arm64 root filesystem \u2014 lets prebuilt Linux binaries run, which the bionic Termux prefix cannot",
+      "optional": true,
+      "totalBytes": 29940736,
+      "items": [
+        {
+          "id": "glibc-rootfs",
+          "version": "24.04-20260924",
+          "size": 29940736,
+          "sha256": "acce61eaff3142b0b21ae2beb39e6411d8359ddbd0fb188aca143aa14fd79e3d",
+          "path": "ubuntu-noble-oci-arm64-root.tar.gz",
+          "url": "https://partner-images.canonical.com/oci/noble/20260924/ubuntu-noble-oci-arm64-root.tar.gz",
+          "kind": "ROOTFS",
+          "provides": []
+        }
+      ]
     }
   ],
-  "unionBytes": 264137240,
-  "packageCount": 78
+  "unionBytes": 294076500,
+  "packageCount": 79
 }

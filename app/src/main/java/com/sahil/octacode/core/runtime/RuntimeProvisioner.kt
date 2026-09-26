@@ -101,12 +101,18 @@ class RuntimeProvisioner(
     }
 
     /**
-     * Install EVERY group in manifest order — the default install.
+     * Install every group that is part of the default runtime.
      *
-     * Rust is part of this set, so one action yields a complete runtime instead of
-     * a partial one. The screen always quotes the real bytes before it is pressed.
+     * Optional groups are left out, deliberately. `optional` used to be a label
+     * the screen drew and nothing else — no group carried it, so the flag never
+     * had to mean anything. It does now: the glibc root filesystem is 29 MB
+     * that nothing in the default runtime needs, and quietly adding it to the
+     * "install everything" button would spend a tenth more of the user's data
+     * and their time on a capability they have not asked for. Each optional
+     * group still has its own row, with its own real byte count and its own
+     * button — the choice stays theirs to make.
      */
-    fun installAll() = runQueue(manifest.groups.map { it.id })
+    fun installAll() = runQueue(manifest.groups.filterNot { it.optional }.map { it.id })
 
     /**
      * True when this artifact still owes the user work: not fetched yet, or
