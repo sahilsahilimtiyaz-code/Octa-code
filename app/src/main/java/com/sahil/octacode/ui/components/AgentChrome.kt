@@ -195,7 +195,7 @@ fun AgentStatusPill(
                 RoundedCornerShape(32.dp)
             )
             .clickable(onClick = onProjectClick)
-            .padding(horizontal = 18.dp, vertical = 14.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(
@@ -206,7 +206,7 @@ fun AgentStatusPill(
                 Icons.Outlined.Folder,
                 contentDescription = null,
                 tint = NeonBlue,
-                modifier = Modifier.size(26.dp)
+                modifier = Modifier.size(22.dp)
             )
             Spacer(Modifier.width(12.dp))
             Text(
@@ -225,14 +225,14 @@ fun AgentStatusPill(
                 Icons.Outlined.KeyboardArrowDown,
                 contentDescription = null,
                 tint = OnDarkMuted,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(18.dp)
             )
         }
         Box(
             modifier = Modifier
                 .padding(horizontal = 12.dp)
                 .width(1.dp)
-                .height(28.dp)
+                .height(22.dp)
                 .background(Color.White.copy(alpha = 0.14f))
         )
         Row(
@@ -351,39 +351,42 @@ fun AccentInfoCard(
                 RoundedCornerShape(22.dp)
             )
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 16.dp),
+            .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(56.dp)
-                .clip(RoundedCornerShape(16.dp))
+                .size(40.dp)
+                .clip(RoundedCornerShape(12.dp))
                 .background(Color.White.copy(alpha = 0.04f))
-                .border(1.2.dp, accent.copy(alpha = 0.70f), RoundedCornerShape(16.dp)),
+                .border(1.2.dp, accent.copy(alpha = 0.70f), RoundedCornerShape(12.dp)),
             contentAlignment = Alignment.Center
         ) {
             icon()
         }
-        Spacer(Modifier.width(14.dp))
+        Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 18.sp,
-                    lineHeight = 22.sp
+                    fontSize = 15.sp,
+                    lineHeight = 19.sp
                 ),
-                color = OnDark
+                color = OnDark,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(3.dp))
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodyMedium.copy(
-                    fontSize = 14.sp,
-                    lineHeight = 19.sp
+                    fontSize = 13.sp,
+                    lineHeight = 17.sp
                 ),
                 color = OnDarkMuted,
-                maxLines = 4
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
         }
         Spacer(Modifier.width(6.dp))
@@ -391,7 +394,7 @@ fun AccentInfoCard(
             Icons.Outlined.ChevronRight,
             contentDescription = null,
             tint = OnDarkMuted,
-            modifier = Modifier.size(24.dp)
+            modifier = Modifier.size(20.dp)
         )
     }
 }
@@ -456,7 +459,7 @@ fun ComposerPill(
             .background(Color.White.copy(alpha = 0.03f))
             .border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(28.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         leadingIcon()

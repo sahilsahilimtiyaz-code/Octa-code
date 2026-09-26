@@ -128,7 +128,7 @@ fun ChatScreen(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     var missionNote by remember {
-        mutableStateOf("A mission feed appears after a real runtime starts work. Nothing is running now.")
+        mutableStateOf("Nothing is running — a mission feed appears once work starts.")
     }
 
     LaunchedEffect(Unit) {
@@ -250,9 +250,9 @@ fun ChatScreen(
                     AccentInfoCard(
                         title = if (ready) "Agent ready" else "Agent unavailable",
                         message = if (ready) {
-                            "Provider ${state.selectedProvider.title} is configured. Type a message to start a real streamed session."
+                            "${state.selectedProvider.title} is configured. Type a message to start."
                         } else {
-                            "No provider or local agent runtime is connected. Configure Model & Provider from the menu before starting a session."
+                            "No provider connected. Add one in Settings → Providers."
                         },
                         accent = ElectricPurple,
                         onClick = {
@@ -347,8 +347,8 @@ fun ChatScreen(
                     Color.White.copy(alpha = 0.10f),
                     RoundedCornerShape(20.dp)
                 )
-                .padding(horizontal = 14.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
