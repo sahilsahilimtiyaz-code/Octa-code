@@ -26,8 +26,12 @@ android {
         // scoped storage, and releases are published on GitHub rather than
         // the Play Store (which mandates a much newer targetSdk).
         targetSdk 28
-        versionCode 1
-        versionName '1.0.0'
+
+        // Kept in step with the release tag: Android shows this in Settings →
+        // Apps, and versionCode must increase for an install to be treated as
+        // an update rather than a downgrade.
+        versionCode 4
+        versionName '1.0.4'
 
         vectorDrawables {
             useSupportLibrary true
