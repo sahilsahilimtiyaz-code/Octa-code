@@ -105,14 +105,62 @@ private fun explainHttp(
         // Safe to surface here: this branch is for statuses with no known cause,
         // so the body is far less likely to be echoing credentials back — and it
         // is the only remaining way to convey what the provider actually said.
-        val detail = cause.message
-            ?.substringAfter(": ", "")
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() && !it.startsWith("<") }
+        val detail = providerDetail(cause.message)
         if (detail != null) {
             "$providerTitle refused the request (HTTP ${cause.status}): $detail"
         } else {
             "$providerTitle refused the request (HTTP ${cause.status})."
         }
     }
+}
+
+/**
+ * The provider's own sentence out of a [describeHttpError] message, which is
+ * `HTTP n from <baseUrl>: <detail>` or, with no detail, just `HTTP n from
+ * <baseUrl>`.
+ *
+ * Shared by the send and fetch explainers so neither grows its own copy of the
+ * separator rules — they differ only in what they say afterwards. Blank and
+ * markup bodies are dropped: a 502 that answered with an HTML page is not a
+ * sentence worth printing into a conversation.
+ */
+internal fun providerDetail(message: String?): String? = message
+    ?.substringAfter(": ", "")
+    ?.trim()
+    ?.takeIf { it.isNotEmpty() && !it.startsWith("<") }
+
+/**
+ * Same job as [explainSendFailure], for a request that only asks a provider
+ * what it serves.
+ *
+ * Only the HTTP wording differs, because these facts are about *sending*: a
+ * 404 while listing means the address has no list, not that a model is missing
+ * — printing "no such model" there would send the user off to change a model
+ * they never picked. Transport failures are delegated instead of rewritten:
+ * an unreachable host says the same thing whichever direction the request was
+ * going, and every branch above [ProviderHttpException] has already been
+ * handled, so none of the model-specific wording below can be reached.
+ */
+fun explainFetchFailure(cause: Throwable, providerTitle: String): String = when (cause) {
+    is ProviderHttpException -> when (cause.status) {
+        401 ->
+            "$providerTitle rejected the API key (HTTP 401). Open Settings → Providers " +
+                "and check the key for that provider."
+        403 ->
+            "$providerTitle will not let this key read its model list (HTTP 403). " +
+                "Check what the key is allowed to reach."
+        404 ->
+            "$providerTitle has no model list at that address (HTTP 404). Check the " +
+                "base URL in Settings → Providers."
+        429 ->
+            "$providerTitle is rate-limiting this key (HTTP 429). Wait a moment and " +
+                "try again."
+        in 500..599 ->
+            "$providerTitle is having trouble (HTTP ${cause.status}). Try again in a moment."
+        else ->
+            providerDetail(cause.message)
+                ?.let { "$providerTitle refused the request (HTTP ${cause.status}): $it" }
+                ?: "$providerTitle refused the request (HTTP ${cause.status})."
+    }
+    else -> explainSendFailure(cause, providerTitle, modelId = null)
 }

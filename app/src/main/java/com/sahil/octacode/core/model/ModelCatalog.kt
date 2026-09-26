@@ -110,6 +110,33 @@ object ModelCatalog {
         ),
     )
 
+    /**
+     * [bundled] plus [fetched] — the list the selector shows and that id
+     * resolution reads from once a key has fetched anything.
+     *
+     * Bundled wins a collision, so a fetched copy of an id already shipped
+     * here is dropped rather than listed twice. That is deliberate: the
+     * bundled entry carries a description and known capabilities that a
+     * `/models` response cannot supply, and this catalog's own contract is
+     * that an id the endpoint later retires fails loudly at request time
+     * instead of vanishing from the list.
+     *
+     * Duplicates *within* [fetched] are dropped too, first provider winning,
+     * because a model id resolves to exactly one adapter downstream — the same
+     * id offered by two providers could only ever be reachable through one of
+     * them, and picking arbitrarily at lookup time would mean sending to
+     * whichever happened to sort first.
+     */
+    fun mergedWith(fetched: List<ModelDef>): List<ModelDef> {
+        if (fetched.isEmpty()) return bundled
+        val taken = bundled.mapTo(HashSet()) { it.id }
+        val extras = ArrayList<ModelDef>(fetched.size)
+        for (model in fetched) {
+            if (taken.add(model.id)) extras += model
+        }
+        return bundled + extras
+    }
+
     /** The subset carried by [adapter], which is what a provider tab shows. */
     fun forAdapter(adapter: ProviderId): List<ModelDef> =
         bundled.filter { it.adapter == adapter }

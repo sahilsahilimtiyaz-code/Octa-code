@@ -186,4 +186,55 @@ class SendFailureTest {
         assertTrue("was: $out", out.contains("the selected model"))
         assertFalse("leaked the null: $out", out.contains("null"))
     }
+
+    // --- failures while listing models --------------------------------------
+
+    @Test
+    fun `a 403 while listing talks about the list, not about a model nobody picked`() {
+        // explainSendFailure's 403 ends with "or pick another model". On a
+        // request that only asked what was available, no model was chosen —
+        // that instruction would send the user off to do something irrelevant.
+        val out = explainFetchFailure(
+            ProviderHttpException(403, "HTTP 403 from https://api.example/v1"),
+            "Groq"
+        )
+
+        assertTrue("was: $out", out.contains("model list"))
+        assertFalse("reached for a model nobody picked: $out", out.contains("pick another model"))
+        assertFalse("must not cite a selection: $out", out.contains("the selected model"))
+    }
+
+    @Test
+    fun `a 404 while listing points at the base url rather than at the model`() {
+        val out = explainFetchFailure(
+            ProviderHttpException(404, "HTTP 404 from https://wrong.example/v1"),
+            "Mistral"
+        )
+
+        assertTrue("was: $out", out.contains("no model list"))
+        assertTrue("was: $out", out.contains("base URL"))
+        assertFalse("reached for a model: $out", out.contains("pick another model"))
+    }
+
+    @Test
+    fun `transport failures say the same thing whichever way they were going`() {
+        // Delegated rather than rewritten: an unreachable host is an
+        // unreachable host, and duplicating the wording would give it two
+        // places to drift apart in.
+        val out = explainFetchFailure(UnknownHostException("api.groq.com"), "Groq")
+
+        assertTrue("was: $out", out.contains("offline"))
+        assertFalse("leaked the host: $out", out.contains("api.groq.com"))
+    }
+
+    @Test
+    fun `an unclassified status still carries what the provider said`() {
+        val out = explainFetchFailure(
+            ProviderHttpException(418, "HTTP 418 from https://api.example/v1: teapot says no"),
+            "xAI"
+        )
+
+        assertTrue("detail dropped: $out", out.contains("teapot says no"))
+        assertTrue("was: $out", out.contains("418"))
+    }
 }

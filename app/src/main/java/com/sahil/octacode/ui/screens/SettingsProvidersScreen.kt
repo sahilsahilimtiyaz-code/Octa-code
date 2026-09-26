@@ -35,7 +35,10 @@ import com.sahil.octacode.core.provider.AiProvider
 import com.sahil.octacode.core.provider.CapabilityBadge
 import com.sahil.octacode.core.provider.ProviderId
 import com.sahil.octacode.data.security.CredentialStore
+import com.sahil.octacode.domain.model.FetchResult
+import com.sahil.octacode.domain.model.FetchedModelsRepository
 import com.sahil.octacode.ui.components.CapabilityBadgeChip
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
@@ -55,6 +58,7 @@ fun SettingsProvidersScreen(
     // allowed a provider to be reachable in chat while its key field was
     // missing here — with no way for the user to supply the key at all.
     adapters: Map<ProviderId, AiProvider> = koinInject(),
+    fetched: FetchedModelsRepository = koinInject(),
 ) {
     val scope = rememberCoroutineScope()
     var statuses by remember { mutableStateOf<Map<ProviderId, ProviderStatus>>(emptyMap()) }
@@ -94,7 +98,11 @@ fun SettingsProvidersScreen(
                 status = statuses[id],
                 savedKey = credentials.getApiKey(id),
                 onSaveKey = { credentials.setApiKey(id, it); refresh() },
-                onClearKey = { credentials.clearApiKey(id); refresh() }
+                onClearKey = { credentials.clearApiKey(id); refresh() },
+                // Suspends rather than returning a note itself: the card owns
+                // the spinner and the scope, and asking it to format text as
+                // well would put network work inside a composable.
+                onFetchModels = { fetched.refresh(id) }
             )
         }
         CustomEndpointCard(credentials, statuses[ProviderId.CUSTOM], onChanged = { refresh() })
@@ -116,9 +124,13 @@ private fun ApiKeyCard(
     status: ProviderStatus?,
     savedKey: String?,
     onSaveKey: (String) -> Unit,
-    onClearKey: () -> Unit
+    onClearKey: () -> Unit,
+    onFetchModels: suspend () -> FetchResult
 ) {
     var input by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+    var fetching by remember { mutableStateOf(false) }
+    var fetchNote by remember { mutableStateOf<String?>(null) }
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -149,6 +161,38 @@ private fun ApiKeyCard(
                     Text("Save")
                 }
                 OutlinedButton(onClick = onClearKey) { Text("Clear") }
+            }
+            // Disabled rather than hidden when there is no key: statusText
+            // above already says the key is missing, so this reads as waiting
+            // on that rather than as a control that ignores taps.
+            OutlinedButton(
+                onClick = {
+                    fetching = true
+                    fetchNote = null
+                    scope.launch {
+                        val result = try {
+                            onFetchModels()
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (t: Throwable) {
+                            // refresh() is contracted not to throw; if something
+                            // does, say so here rather than let a button press
+                            // take the process down.
+                            FetchResult(false, t.message ?: "The request failed.")
+                        }
+                        fetchNote = result.message
+                        fetching = false
+                    }
+                },
+                enabled = !fetching && !savedKey.isNullOrBlank(),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(if (fetching) "Fetching…" else "Fetch models")
+            }
+            // Success and failure are shown in the same place: a fetch that
+            // quietly did nothing is indistinguishable from one that worked.
+            fetchNote?.let { note ->
+                Text(note, style = MaterialTheme.typography.bodySmall)
             }
         }
     }

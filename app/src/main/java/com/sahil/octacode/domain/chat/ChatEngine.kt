@@ -94,6 +94,16 @@ class ChatEngine(
     private val providers: Map<ProviderId, AiProvider>,
     private val modelFor: (ProviderId) -> String = ::defaultModelFor,
     /**
+     * Resolves a model id to the row behind it.
+     *
+     * Defaults to the bundled catalog, which is every test setup's answer.
+     * Production injects the bundled-plus-fetched view, because [selectModel]
+     * refuses anything this cannot find: a row the picker had just offered
+     * would otherwise be dropped on the way to the wire with no message and
+     * no send, which is the half-done action this project does not ship.
+     */
+    private val catalog: (String) -> ModelDef? = { ModelCatalog.byId(it) },
+    /**
      * Null means "this instance does not persist" — the tests' setup, never
      * production, which always receives the Room-backed implementation.
      */
@@ -178,7 +188,7 @@ class ChatEngine(
         // drops any selection that does not belong here, rather than leaving
         // it to be resolved against a transport that does not serve it.
         val selected = _state.value.selectedModelId
-        val stillApplies = selected != null && ModelCatalog.byId(selected)?.adapter == id
+        val stillApplies = selected != null && catalog(selected)?.adapter == id
         _state.update {
             it.copy(
                 selectedProvider = id,
@@ -198,14 +208,14 @@ class ChatEngine(
      * light that was taken somewhere else. The chat screen re-probes
      * immediately after a pick, so the user does not see the gap.
      *
-     * Refuses anything not in [ModelCatalog]. Everything downstream resolves
-     * the id back against the catalog, so accepting a row from anywhere else
-     * would show a selection that can never reach the wire — the decorative
-     * control this project does not ship.
+     * Refuses anything the injected [catalog] view cannot find. Everything
+     * downstream resolves the id back through it, so accepting a row from
+     * anywhere else would show a selection that can never reach the wire — the
+     * decorative control this project does not ship.
      */
     fun selectModel(model: ModelDef) {
         if (_state.value.busy) return
-        if (ModelCatalog.byId(model.id) != model) return
+        if (catalog(model.id) != model) return
         _state.update {
             it.copy(
                 selectedModelId = model.id,
@@ -227,7 +237,7 @@ class ChatEngine(
      */
     private fun modelOnWire(providerId: ProviderId): String {
         val picked = _state.value.selectedModelId
-            ?.let { ModelCatalog.byId(it) }
+            ?.let { catalog(it) }
             ?.takeIf { it.adapter == providerId }
         return picked?.id ?: modelFor(providerId)
     }

@@ -42,7 +42,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.sahil.octacode.core.model.ModelCatalog
 import com.sahil.octacode.core.model.ModelDef
 import com.sahil.octacode.core.model.ModelRow
 import com.sahil.octacode.core.model.ModelSection
@@ -84,6 +83,14 @@ fun ModelSelectorSheet(
     selectedModelId: String?,
     selectedProvider: ProviderId,
     states: Map<String, ModelUserState>,
+    /**
+     * What the selector may offer: the bundled catalog plus whatever a
+     * provider fetched for this key. Passed in rather than read straight from
+     * `ModelCatalog` so the sheet cannot show one list while id resolution
+     * reads another — a row here that the engine cannot find is a row that
+     * does nothing when tapped.
+     */
+    models: List<ModelDef>,
     availableProviders: Set<ProviderId>,
     busy: Boolean = false,
     onSelectModel: (ModelDef) -> Unit,
@@ -96,21 +103,26 @@ fun ModelSelectorSheet(
     var query by remember { mutableStateOf("") }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    val sections = remember(states, selectedModelId, query) {
+    // `models` is part of the key: a fetch that lands while the sheet is open
+    // has to re-run this, or the list the user just asked for stays invisible
+    // until they happen to type or pick something.
+    val sections = remember(models, states, selectedModelId, query) {
         ModelSectioning.build(
-            models = ModelCatalog.bundled,
+            models = models,
             states = states,
             selectedModelId = selectedModelId,
             query = query,
         )
     }
 
-    // Endpoints the catalog has nothing for: the custom endpoint, plus any
-    // adapter that ships without bundled models. Models are grouped by their
-    // provider above, so this list only carries what could not appear there.
-    val bareEndpoints = remember(availableProviders) {
+    // Endpoints no model row covers: the custom endpoint, plus any adapter
+    // with neither shipped nor fetched models. Models are grouped by their
+    // provider above, so this list carries what could not appear there — and
+    // a provider that has just fetched must leave it, or the sheet would offer
+    // two ways to reach it, one of which arrives with no model chosen.
+    val bareEndpoints = remember(availableProviders, models) {
         ProviderId.entries.filter { id ->
-            ModelCatalog.bundled.none { it.adapter == id }
+            models.none { it.adapter == id }
         }
     }
 
@@ -127,7 +139,7 @@ fun ModelSelectorSheet(
                 .navigationBarsPadding()
         ) {
             SheetHeader(
-                count = ModelCatalog.bundled.size,
+                count = models.size,
                 onClose = onDismiss,
             )
 
@@ -163,7 +175,7 @@ fun ModelSelectorSheet(
             Spacer(Modifier.height(8.dp))
 
             if (sections.isEmpty()) {
-                NoMatches(query = query)
+                NoMatches(query = query, models = models)
             } else {
                 LazyColumn(
                     modifier = Modifier
@@ -237,7 +249,9 @@ private fun SheetHeader(count: Int, onClose: () -> Unit) {
         Column(Modifier.weight(1f)) {
             Text("Model", style = MaterialTheme.typography.titleLarge, color = OnDark)
             Text(
-                "$count bundled · grouped by provider",
+                // "bundled" would now be untrue: some of these arrived from an
+                // endpoint when a key was pressed.
+                "$count available · grouped by provider",
                 style = MaterialTheme.typography.bodySmall,
                 color = OnDarkMuted,
             )
@@ -396,7 +410,7 @@ private fun RefreshRow(onClick: () -> Unit) {
 }
 
 @Composable
-private fun NoMatches(query: String) {
+private fun NoMatches(query: String, models: List<ModelDef>) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -404,10 +418,10 @@ private fun NoMatches(query: String) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            text = if (ModelSectioning.isEmptyAfterSearch(ModelCatalog.bundled, query)) {
+            text = if (ModelSectioning.isEmptyAfterSearch(models, query)) {
                 "No models match \u201C$query\u201D."
             } else {
-                "No models are bundled."
+                "There are no models to show yet."
             },
             style = MaterialTheme.typography.bodyLarge,
             color = OnDark,
@@ -416,7 +430,7 @@ private fun NoMatches(query: String) {
         Spacer(Modifier.height(6.dp))
         Text(
             text = "Search covers display name, model id and provider. " +
-                "${ModelCatalog.bundled.size} models are bundled.",
+                "${models.size} models available.",
             style = MaterialTheme.typography.bodySmall,
             color = OnDarkMuted,
             textAlign = TextAlign.Center,

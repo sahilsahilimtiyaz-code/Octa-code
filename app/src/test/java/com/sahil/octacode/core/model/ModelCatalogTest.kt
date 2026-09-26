@@ -82,4 +82,60 @@ class ModelCatalogTest {
         assertNotNull(ModelCatalog.byId("gpt-4o-mini"))
         assertNull(ModelCatalog.byId("model-that-does-not-exist"))
     }
+
+    @Test
+    fun `mergedWith is the bundled list untouched when nothing was fetched`() {
+        assertEquals(ModelCatalog.bundled, ModelCatalog.mergedWith(emptyList()))
+    }
+
+    @Test
+    fun `fetched models are appended without disturbing the shipped ones`() {
+        val fetched = ModelDef(
+            id = "grok-4.6",
+            displayName = "grok-4.6",
+            provider = "xAI",
+            adapter = ProviderId.XAI,
+        )
+        val merged = ModelCatalog.mergedWith(listOf(fetched))
+
+        assertEquals(ModelCatalog.bundled, merged.take(ModelCatalog.bundled.size))
+        assertTrue(fetched in merged)
+        // The shipped list is the app's own; a fetch must never write into it.
+        assertTrue(ModelCatalog.bundled.none { it.id == "grok-4.6" })
+    }
+
+    @Test
+    fun `a fetched id already shipped here is not listed twice`() {
+        // The bundled entry carries a description and known capabilities that
+        // a `/models` response cannot supply, so it wins the collision.
+        val fetchedCopy = ModelCatalog.bundled.first().copy(provider = "Someone Else")
+        val merged = ModelCatalog.mergedWith(listOf(fetchedCopy))
+
+        assertEquals(1, merged.count { it.id == fetchedCopy.id })
+        assertEquals("OpenAI", merged.first { it.id == fetchedCopy.id }.provider)
+    }
+
+    @Test
+    fun `the same id offered by two providers resolves to exactly one of them`() {
+        // A model id carries its adapter downstream, so leaving both rows in
+        // would make lookup pick whichever happened to sort first — and the
+        // user would have no way to tell why one provider's model kept
+        // vanishing.
+        val first = ModelDef(
+            id = "shared",
+            displayName = "shared",
+            provider = "A",
+            adapter = ProviderId.GROQ,
+        )
+        val second = ModelDef(
+            id = "shared",
+            displayName = "shared",
+            provider = "B",
+            adapter = ProviderId.MISTRAL,
+        )
+        val merged = ModelCatalog.mergedWith(listOf(first, second))
+
+        assertEquals(1, merged.count { it.id == "shared" })
+        assertEquals("A", merged.first { it.id == "shared" }.provider)
+    }
 }

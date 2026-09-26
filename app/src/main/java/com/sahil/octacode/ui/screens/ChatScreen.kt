@@ -62,6 +62,7 @@ import com.sahil.octacode.data.workspace.WorkspaceStore
 import com.sahil.octacode.domain.chat.ChatEngine
 import com.sahil.octacode.domain.mission.MissionRepository
 import com.sahil.octacode.domain.mission.MissionStatus
+import com.sahil.octacode.domain.model.FetchedModelsRepository
 import com.sahil.octacode.domain.model.ModelUserStateRepository
 import com.sahil.octacode.ui.components.AccentInfoCard
 import com.sahil.octacode.ui.components.AgentHeroCopy
@@ -103,12 +104,20 @@ fun ChatScreen(
     adapters: Map<ProviderId, AiProvider> = koinInject(),
     settingsRepository: SettingsRepository = koinInject(),
     workspaceStore: WorkspaceStore = koinInject(),
+    /**
+     * Fetched model lists. Read here so the sheet, the header label and the
+     * engine's own id resolution can all be handed the same merged list — three
+     * views of "what is selectable" that disagree would show a name the send
+     * path has never heard of.
+     */
+    fetchedModels: FetchedModelsRepository = koinInject(),
 ) {
     val state by engine.state.collectAsState()
     val modelStates by modelState.states.collectAsState()
     val settings by settingsRepository.settings.collectAsState()
     val folderList by workspaceStore.workspaces.collectAsState()
     val activeFolderId by workspaceStore.activeId.collectAsState()
+    val fetched by fetchedModels.models.collectAsState()
     /**
      * Read from the id rather than held, so a folder renamed or removed here
      * cannot leave the pill naming something that no longer exists.
@@ -163,7 +172,13 @@ fun ChatScreen(
     }
     // Readiness already lives in agentLabel above; this pill answers the
     // different question — which model is next to go out.
-    val pickedModel = state.selectedModelId?.let { ModelCatalog.byId(it) }
+    //
+    // Merged rather than read from ModelCatalog.bundled: a model a provider
+    // fetched has no bundled entry, so resolving it to null would drop it from
+    // this header while the engine still had it selected and was going to send
+    // it.
+    val models = remember(fetched) { ModelCatalog.mergedWith(fetched) }
+    val pickedModel = state.selectedModelId?.let { id -> models.firstOrNull { it.id == id } }
     val modelLabel = pickedModel?.displayName ?: state.selectedProvider.title
 
     if (modelSheet) {
@@ -171,6 +186,7 @@ fun ChatScreen(
             selectedModelId = state.selectedModelId,
             selectedProvider = state.selectedProvider,
             states = modelStates,
+            models = models,
             availableProviders = adapters.keys,
             busy = state.busy,
             // Both close and re-probe: selectModel/selectProvider drop the

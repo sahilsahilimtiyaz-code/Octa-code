@@ -62,6 +62,9 @@ private fun chatEngine(
     modelState: ModelUserStateRepository? = null,
     repository: ChatRepository? = null,
     activeWorkspaceId: () -> String? = { null },
+    // Defaults to the bundled catalog exactly as ChatEngine itself does, so a
+    // test that does not care about fetched models sees no change.
+    catalog: (String) -> ModelDef? = { ModelCatalog.byId(it) },
     clock: () -> Long = { System.currentTimeMillis() }
 ): ChatEngine = ChatEngine(
     registry = registry,
@@ -69,6 +72,7 @@ private fun chatEngine(
     modelState = modelState,
     repository = repository,
     activeWorkspaceId = activeWorkspaceId,
+    catalog = catalog,
     clock = clock,
     scope = scope
 )
@@ -360,6 +364,43 @@ class ChatEngineTest {
         assertNull(engine.state.value.selectedModelId)
         assertNotNull(engine.state.value.providerStatus)
     }
+
+    @Test
+    fun `a model the injected catalog can see is selectable, one it cannot is still refused`() =
+        runTest {
+            // A model fetched from a provider has no bundled entry, so under
+            // the default catalog it would be dropped here — no selection, no
+            // send, no message — while the picker went on offering the row.
+            val fetched = ModelDef(
+                id = "deepseek-v4-flash",
+                displayName = "deepseek-v4-flash",
+                provider = "DeepSeek",
+                adapter = ProviderId.DEEPSEEK,
+            )
+            val engine = chatEngine(
+                registry = readyRegistry(),
+                providers = emptyMap(),
+                scope = this,
+                catalog = { queried -> if (queried == fetched.id) fetched else null }
+            )
+            engine.refreshProviderStatus()
+
+            engine.selectModel(fetched)
+            assertEquals(fetched.id, engine.state.value.selectedModelId)
+            assertEquals(ProviderId.DEEPSEEK, engine.state.value.selectedProvider)
+
+            // Injection widens what may be chosen; it does not switch the
+            // guard off. Anything outside the injected view is still refused.
+            engine.selectModel(
+                ModelDef(
+                    id = "not-in-the-catalog",
+                    displayName = "Impostor",
+                    provider = "Nowhere",
+                    adapter = ProviderId.CUSTOM
+                )
+            )
+            assertEquals(fetched.id, engine.state.value.selectedModelId)
+        }
 
     @Test
     fun `switching provider drops a model that does not belong there`() = runTest {

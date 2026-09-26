@@ -39,6 +39,14 @@ internal data class WireMsg(val role: String, val content: String)
 
 class ProviderHttpException(val status: Int, message: String) : Exception(message)
 
+/**
+ * OpenAI's base. One constant because two places need it now — the adapter
+ * that streams and the client that lists models — and two copies of a URL are
+ * two chances to edit one and forget the other, which would read to the user
+ * as a key that stopped working.
+ */
+internal const val OPENAI_BASE_URL = "https://api.openai.com/v1"
+
 // Shared OpenAI-compatible streaming implementation used by OpenAiAdapter
 // and CustomEndpointAdapter (same wire protocol, different base URL / key slot).
 internal fun openAiCompatibleStream(
@@ -207,7 +215,7 @@ class OpenAiAdapter(
     override fun chatStream(request: ChatRequest): Flow<ChatChunk> {
         val key = credentials.getApiKey(id)
             ?: throw IllegalStateException("OpenAI API key not configured")
-        return openAiCompatibleStream(http, "https://api.openai.com/v1", key, request)
+        return openAiCompatibleStream(http, OPENAI_BASE_URL, key, request)
     }
 }
 
