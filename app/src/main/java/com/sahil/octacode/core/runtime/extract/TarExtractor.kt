@@ -75,6 +75,7 @@ object TarExtractor {
             if (prefix.isNotEmpty()) name = "$prefix/$name"
 
             val size = TarHeader.parseOctal(header, 124, 12, "tar member size")
+            val mode = TarHeader.parseMode(header)
             // Type 0 and type NUL both mean a plain file; normalise so the
             // branches below never have to name the NUL byte itself.
             val rawType = header[156].toInt()
@@ -132,6 +133,7 @@ object TarExtractor {
                     bytesWritten += writeFile(
                         input, size, target, canonicalRoot, maxBytes, bytesWritten, name
                     )
+                    applyMode(target, mode, name)
                     written += relative
                     TarHeader.skipPadding(input, size)
                 }
@@ -177,6 +179,34 @@ object TarExtractor {
     }
 
     // ---------------------------------------------------------------- writing
+
+    /**
+     * Restores the execute bit, and deliberately nothing else.
+     *
+     * An archive is untrusted input, so its mode is not applied wholesale: a
+     * package that asked for setuid or setgid would be granting itself
+     * privileges it has no business having, and honouring owner-write on
+     * someone else's file is a decision this app should not be making on the
+     * archive's behalf.
+     *
+     * The execute bit is the exception that has to be honoured. Without it,
+     * every binary in an unpacked root filesystem lands non-executable, and a
+     * userland that cannot execute anything is not a userland — the failure
+     * is a bare "Permission denied" from a shell the user installed and was
+     * told was ready.
+     *
+     * `ownerOnly = false` because 0755 means group and other may execute too,
+     * and a guest process running as any uid has to be able to start it.
+     */
+    private fun applyMode(target: File, mode: Int, entryName: String) {
+        val executable = (mode and 0b001_001_001) != 0
+        if (!target.setExecutable(executable, false) && executable) {
+            throw ExtractionException(
+                "'$entryName' needs to be executable and this filesystem will not " +
+                    "allow it — install it somewhere else or uninstall the runtime"
+            )
+        }
+    }
 
     private fun writeFile(
         input: InputStream,
@@ -236,10 +266,16 @@ object TarExtractor {
                 throw ExtractionException("could not replace ${target.path}")
             }
         }
-        target.parentFile?.mkdirs()
+        // Resolved once, non-null, rather than safe-called here and used
+        // unsafely two lines down: a hard link's target is resolved against
+        // the parent, so a null there is a crash inside the very code that
+        // decides where an untrusted archive is allowed to put things.
+        val parent = target.parentFile
+            ?: throw ExtractionException("no parent directory for ${target.path}")
+        parent.mkdirs()
         try {
             if (hard) {
-                Files.createLink(target.toPath(), target.parentFile.resolve(linkTarget).toPath())
+                Files.createLink(target.toPath(), parent.resolve(linkTarget).toPath())
             } else {
                 Files.createSymbolicLink(target.toPath(), File(linkTarget).toPath())
             }

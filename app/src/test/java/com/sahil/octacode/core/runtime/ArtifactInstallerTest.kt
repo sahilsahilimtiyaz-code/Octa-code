@@ -282,4 +282,30 @@ class ArtifactInstallerTest {
             result.reason.contains("no verification record")
         )
     }
+
+    @Test
+    fun `a root filesystem lands its binaries runnable`() {
+        // The installer's own guarantee, not just the extractor's: a glibc
+        // userland whose bash cannot be run is the one thing a user would
+        // report as "the app says it's installed and then everything is
+        // Permission denied".
+        val bytes = DebFixtures.gzip(
+            DebFixtures.tar(
+                listOf(
+                    DebFixtures.Entry.executable("usr/bin/bash", "ELF"),
+                    DebFixtures.Entry.file("etc/os-release", "NAME=Ubuntu")
+                )
+            )
+        )
+        val art = rootfsArtifact("glibc-rootfs", bytes)
+        ledger.markVerified(art)
+
+        val result = installer.install(art, cached("glibc-rootfs", bytes))
+
+        assertTrue("got $result", result is InstallResult.Installed)
+        val bash = File(installer.rootfsRoot, "usr/bin/bash")
+        assertTrue("bash must be runnable", bash.canExecute())
+        // And the converse: a data file must not become a thing you can run.
+        assertFalse(File(installer.rootfsRoot, "etc/os-release").canExecute())
+    }
 }

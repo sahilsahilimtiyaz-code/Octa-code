@@ -22,11 +22,21 @@ object DebFixtures {
         val name: String,
         val type: Char = '0',
         val link: String = "",
-        val data: ByteArray = ByteArray(0)
+        val data: ByteArray = ByteArray(0),
+        /**
+         * The permission field as it appears in the tar header, octal and
+         * eight wide. Settable because the extractor's handling of it is
+         * behaviour worth testing rather than an implementation detail.
+         */
+        val mode: String = "0000644"
     ) {
         companion object {
             fun file(path: String, contents: String) =
                 Entry(path, '0', "", contents.toByteArray(Charsets.UTF_8))
+
+            /** A file the archive asks to be runnable, as a real binary is. */
+            fun executable(path: String, contents: String) =
+                Entry(path, '0', "", contents.toByteArray(Charsets.UTF_8), "0000755")
 
             fun dir(path: String) = Entry(path, '5')
 
@@ -109,7 +119,7 @@ object DebFixtures {
     private fun header(entry: Entry): ByteArray {
         val block = ByteArray(512)
         put(block, 0, entry.name, 100)
-        put(block, 100, "0000644", 8) // mode
+        put(block, 100, entry.mode, 8) // mode
         put(block, 108, "0000000", 8) // uid
         put(block, 116, "0000000", 8) // gid
         put(block, 124, octal(entry.data.size, 12), 12) // size

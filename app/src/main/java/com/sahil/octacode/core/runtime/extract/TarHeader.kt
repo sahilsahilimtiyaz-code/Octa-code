@@ -65,6 +65,15 @@ internal object TarHeader {
         return true
     }
 
+    /**
+     * The permission bits this entry asks for.
+     *
+     * Read so [TarExtractor] can restore the execute bit and nothing else. The
+     * field is 8 bytes of octal at offset 100, per the ustar layout.
+     */
+    fun parseMode(block: ByteArray): Int =
+        parseOctal(block, 100, 8, "tar mode").toInt()
+
     /** Consumes a payload carrying a single string (GNU `L`/`K`, PAX records). */
     fun readText(input: InputStream, size: Long): String {
         if (size < 0 || size > 64 * 1024 * 1024) {

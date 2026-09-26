@@ -227,4 +227,56 @@ class DebExtractorTest {
 
         expectFailure("no debian-binary") { DebExtractor.extract(deb, root) }
     }
+
+
+    // --- permissions ------------------------------------------------------
+    //
+    // The extractor used to ignore the mode field entirely. Every file landed
+    // 0644, which is invisible for data and fatal for a root filesystem: the
+    // bash inside it could not be run, and the user was told the glibc
+    // userland was ready.
+
+    @Test
+    fun `an entry that asks to be executable lands executable`() {
+        debWith(
+            listOf(
+                DebFixtures.Entry.executable(
+                    "${DebFixtures.PREFIX}bin/bash",
+                    "#!/bin/bash\necho hi\n"
+                )
+            )
+        ).let { DebExtractor.extract(it, root) }
+
+        val bash = File(root, "bin/bash")
+        assertTrue("$bash should exist", bash.isFile)
+        assertTrue("mode was ${bash.canExecute()}", bash.canExecute())
+    }
+
+    @Test
+    fun `an entry that asks to be plain data does not become runnable`() {
+        // The converse matters too: restoring the bit unconditionally would
+        // make every config file and every .so a thing the user could run.
+        debWith(
+            listOf(
+                DebFixtures.Entry.file("${DebFixtures.PREFIX}etc/motd", "hello")
+            )
+        ).let { DebExtractor.extract(it, root) }
+
+        assertFalse(File(root, "etc/motd").canExecute())
+    }
+
+    @Test
+    fun `a group-only execute bit still counts as executable`() {
+        // 0710 has no owner-execute bit. Refusing to run it because it looked
+        // like it "was not executable" would be wrong: the archive is the
+        // authority on its own permissions.
+        val entry = DebFixtures.Entry(
+            name = "${DebFixtures.PREFIX}bin/tool",
+            data = "#!/bin/sh\n".toByteArray(Charsets.UTF_8),
+            mode = "0000710"
+        )
+        debWith(listOf(entry)).let { DebExtractor.extract(it, root) }
+
+        assertTrue(File(root, "bin/tool").canExecute())
+    }
 }
