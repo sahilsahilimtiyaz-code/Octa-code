@@ -7,9 +7,11 @@ import com.sahil.octacode.core.runtime.RuntimeIndex
 import com.sahil.octacode.core.runtime.RuntimeLedger
 import com.sahil.octacode.core.runtime.RuntimeManifest
 import com.sahil.octacode.core.runtime.RuntimeProvisioner
+import com.sahil.octacode.data.agent.DefaultAgentRepository
 import com.sahil.octacode.core.shell.PrefixShell
 import com.sahil.octacode.core.shell.ProotRunner
 import com.sahil.octacode.data.net.KtorHttpFactory
+import com.sahil.octacode.domain.agent.AgentRepository
 import java.io.File
 import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
@@ -54,6 +56,19 @@ val runtimeModule = module {
             prefix = File(androidContext().filesDir, "runtimes/prefix"),
             home = File(androidContext().filesDir, "home"),
             index = get()
+        )
+    }
+
+    // M13a: what the app can install and start, read from the same manifest
+    // and ledger the runtime screen writes to. Reporting installed-ness from
+    // one place is the point — a second list would go on claiming a tool was
+    // available after the user removed it.
+    single<AgentRepository> {
+        DefaultAgentRepository(
+            manifest = get(),
+            ledger = get(),
+            rootfs = File(androidContext().filesDir, "runtimes/rootfs"),
+            proot = get()
         )
     }
 

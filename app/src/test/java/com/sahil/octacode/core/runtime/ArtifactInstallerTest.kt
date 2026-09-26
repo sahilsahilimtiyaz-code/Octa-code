@@ -308,4 +308,140 @@ class ArtifactInstallerTest {
         // And the converse: a data file must not become a thing you can run.
         assertFalse(File(installer.rootfsRoot, "etc/os-release").canExecute())
     }
+
+    // --- M13a: an agent, unpacked into the guest -------------------------
+    //
+    // A glibc binary in the bionic prefix is a 60 MB file that fails on the
+    // ELF loader every time it runs. The destination is the whole point.
+
+    private fun opencodeArtifact(id: String, bytes: ByteArray) = RuntimeArtifact(
+        id = id,
+        version = "1.18.32",
+        size = bytes.size.toLong(),
+        sha256 = MessageDigest.getInstance("SHA-256").digest(bytes)
+            .joinToString("") { "%02x".format(it) },
+        path = "opencode-linux-arm64.tar.gz",
+        url = "https://github.com/anomalyco/opencode/releases/download/v1.18.32/" +
+            "opencode-linux-arm64.tar.gz",
+        kind = RuntimeArtifact.Kind.EXECUTABLE
+    )
+
+    private fun agentArchive(name: String = "opencode", mode: String = "0000755") =
+        DebFixtures.gzip(
+            DebFixtures.tar(listOf(DebFixtures.Entry(name, '0', "", "ELF".toByteArray(), mode)))
+        )
+
+    /** Puts a minimal but genuinely unpacked root filesystem in place. */
+    private fun installRootfs() {
+        val bytes = DebFixtures.rootfsTgz("usr/bin/bash" to "ELF")
+        val art = rootfsArtifact("glibc-rootfs", bytes)
+        ledger.markVerified(art)
+        installer.install(art, cached("glibc-rootfs", bytes))
+    }
+
+    @Test
+    fun `an agent lands in the guest, runnable, and never in the prefix`() {
+        installRootfs()
+        val bytes = agentArchive()
+        val art = opencodeArtifact("opencode", bytes)
+        ledger.markVerified(art)
+
+        val result = installer.install(art, cached("opencode", bytes))
+
+        assertTrue("got $result", result is InstallResult.Installed)
+        val guest = File(installer.rootfsRoot, "usr/local/bin/opencode")
+        assertTrue("must land in the glibc userland", guest.isFile)
+        assertTrue("must be runnable", guest.canExecute())
+        assertFalse("must not land in the bionic prefix", File(prefix, "usr/local/bin/opencode").exists())
+        // The name comes from the manifest, and readiness is derived from it.
+        assertEquals("usr/local/bin/opencode", art.guestCommandPath)
+    }
+
+    @Test
+    fun `an agent is refused outright when the glibc userland is absent`() {
+        val bytes = agentArchive()
+        val art = opencodeArtifact("opencode", bytes)
+        ledger.markVerified(art)
+
+        val result = installer.install(art, cached("opencode", bytes))
+
+        assertTrue("got $result", result is InstallResult.Failed)
+        val reason = (result as InstallResult.Failed).reason
+        assertTrue("must name what is missing: $reason", reason.contains("glibc userland"))
+        assertTrue("must say where to fix it: $reason", reason.contains("Runtime"))
+        // Nothing unpacked means nothing claimed.
+        assertFalse(requireNotNull(ledger.get("opencode")).isInstalled)
+    }
+
+    @Test
+    fun `an archive with more than one file is refused, not partly installed`() {
+        // A release that starts shipping a shared library is a different
+        // artifact. Mapping every entry onto one destination would collapse
+        // both onto the same path and quietly drop one, so the count is taken
+        // from what was really unpacked.
+        installRootfs()
+        val bytes = DebFixtures.gzip(
+            DebFixtures.tar(
+                listOf(
+                    DebFixtures.Entry.executable("opencode", "ELF"),
+                    DebFixtures.Entry.file("libsomething.so", "SO")
+                )
+            )
+        )
+        val art = opencodeArtifact("opencode", bytes)
+        ledger.markVerified(art)
+
+        val result = installer.install(art, cached("opencode", bytes))
+
+        assertTrue("got $result", result is InstallResult.Failed)
+        assertTrue(
+            "must say what it held: ${(result as InstallResult.Failed).reason}",
+            result.reason.contains("2")
+        )
+        // Nothing half-installed: an agent that unpacks cleanly and then
+        // fails to start is the outcome this is here to prevent.
+        assertFalse(File(installer.rootfsRoot, "usr/local/bin/opencode").exists())
+        assertFalse(requireNotNull(ledger.get("opencode")).isInstalled)
+    }
+
+    @Test
+    fun `the command is named by the manifest, whatever the archive called it`() {
+        // The archive is a transport container; the name the app later looks
+        // for is the manifest's. Installing the file under the name it shipped
+        // with would mean the readiness check and the executable could drift
+        // apart across releases.
+        installRootfs()
+        val bytes = agentArchive(name = "something-else")
+        val art = opencodeArtifact("opencode", bytes)
+        ledger.markVerified(art)
+
+        val result = installer.install(art, cached("opencode", bytes))
+
+        assertTrue("got $result", result is InstallResult.Installed)
+        assertTrue(
+            "installed under the manifest's name",
+            File(installer.rootfsRoot, "usr/local/bin/opencode").canExecute()
+        )
+        assertFalse(File(installer.rootfsRoot, "usr/local/bin/something-else").exists())
+    }
+
+    @Test
+    fun `an agent shipped without its execute bit is corrected, not refused`() {
+        // The manifest already declared this artifact an EXECUTABLE, so a
+        // missing bit is a packaging slip to correct rather than a reason to
+        // hand the user an installed tool that fails on every run. The
+        // converse matters too: refusing here would report a failure that
+        // blames the filesystem for the archive's own mode field.
+        installRootfs()
+        val bytes = agentArchive(mode = "0000644")
+        val art = opencodeArtifact("opencode", bytes)
+        ledger.markVerified(art)
+
+        val result = installer.install(art, cached("opencode", bytes))
+
+        assertTrue("got $result", result is InstallResult.Installed)
+        val guest = File(installer.rootfsRoot, "usr/local/bin/opencode")
+        assertTrue("must be runnable whatever the archive said", guest.canExecute())
+        assertTrue(requireNotNull(ledger.get("opencode")).isInstalled)
+    }
 }

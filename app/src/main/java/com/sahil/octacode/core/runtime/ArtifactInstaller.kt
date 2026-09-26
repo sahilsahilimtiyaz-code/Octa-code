@@ -52,7 +52,11 @@ class ArtifactInstaller(
         if (!deb.isFile) {
             return InstallResult.Failed("verified bytes for ${artifact.id} are missing from the cache")
         }
-        if (artifact.kind == RuntimeArtifact.Kind.ROOTFS) return installRootfs(artifact, deb)
+        when (artifact.kind) {
+            RuntimeArtifact.Kind.ROOTFS -> return installRootfs(artifact, deb)
+            RuntimeArtifact.Kind.EXECUTABLE -> return installGuestExecutable(artifact, deb)
+            RuntimeArtifact.Kind.DEB -> Unit
+        }
 
         val staging = File(stagingRoot, artifact.id)
         staging.deleteRecursively()
@@ -178,6 +182,122 @@ class ArtifactInstaller(
         val cleaned = path.removePrefix("./").removePrefix("/").trimEnd('/')
         return if (cleaned.isEmpty() || cleaned == ".") PathMapping.Ignore
         else PathMapping.Place(cleaned)
+    }
+
+
+    /**
+     * True when a glibc root filesystem is really there.
+     *
+     * The staging swap in [installRootfs] is all-or-nothing, so a `usr`
+     * directory can only exist there if a whole image arrived. That is what
+     * makes this structural check sound — and it is a real check, because the
+     * alternative is an executable unpacked into a filesystem that is not
+     * there, which is a 60 MB file that can never run and still says
+     * "installed".
+     */
+    private fun rootfsPresent(): Boolean = File(rootfsRoot, "usr").isDirectory
+
+    /**
+     * Unpacks a single guest executable.
+     *
+     * It goes into the root filesystem, never the prefix. The two are
+     * different C libraries, and a glibc binary in a bionic prefix is a file
+     * that fails on the ELF loader every single time it is run.
+     *
+     * The destination name comes from the manifest, not from the archive. An
+     * archive that says what to call itself would let a downloaded file choose
+     * the name the app later looks for — and `commandNames`, which the
+     * readiness check reads, is derived from the id.
+     */
+    private fun installGuestExecutable(artifact: RuntimeArtifact, archive: File): InstallResult {
+        if (!rootfsPresent()) {
+            return InstallResult.Failed(
+                "${artifact.id} is a glibc Linux binary, so it needs the glibc userland, " +
+                    "which is not installed. Install \"glibc userland\" in Settings > Runtime first."
+            )
+        }
+
+        val relative = artifact.guestCommandPath
+            ?: return InstallResult.Failed("${artifact.id} is not a guest executable")
+
+        val staging = File(stagingRoot, artifact.id)
+        staging.deleteRecursively()
+        staging.mkdirs()
+
+        // Extracted under each entry's OWN name first, then moved to the name
+        // the manifest declares. Mapping every entry straight onto the
+        // destination instead would collapse a two-file archive — a binary
+        // plus a shared library — onto one path, and the second would silently
+        // overwrite the first while the "exactly one file" check below, which
+        // reads a set, still saw one.
+        val extracted = try {
+            GZIPInputStream(archive.inputStream().buffered()).use { gunzipped ->
+                TarExtractor.extract(
+                    gunzipped, staging, rootfsSafetyCap(archive.length()), { name ->
+                        val base = name.trimStart('/').substringAfterLast('/')
+                        if (base.isEmpty() || base == ".") PathMapping.Ignore
+                        else PathMapping.Place(base)
+                    }
+                )
+            }
+        } catch (e: Exception) {
+            staging.deleteRecursively()
+            return InstallResult.Failed(
+                "Unpacking ${artifact.id} ${artifact.version} — ${e.message ?: "unknown error"}"
+            )
+        }
+
+        // Exactly one file, and nothing quietly dropped. A release that starts
+        // shipping a shared library or a second binary is a different artifact,
+        // and unpacking part of it would produce an agent that installs
+        // cleanly and then fails to start.
+        if (extracted.files.size != 1) {
+            staging.deleteRecursively()
+            return InstallResult.Failed(
+                "${artifact.id} ${artifact.version} should hold exactly one executable, " +
+                    "it held ${extracted.files.size}"
+            )
+        }
+
+        return try {
+            val target = File(rootfsRoot, relative)
+            val parent = target.parentFile
+                ?: return InstallResult.Failed("no parent directory for ${target.path}")
+            parent.mkdirs()
+            val source = File(staging, extracted.files.first())
+            if (target.exists() && !target.delete()) {
+                return InstallResult.Failed(
+                    "could not replace an existing ${artifact.id} — remove it and try again"
+                )
+            }
+            if (!source.renameTo(target)) source.copyTo(target, overwrite = true)
+
+            // The archive's own mode is honoured everywhere else, but here
+            // the manifest has already said what this file is for: an
+            // EXECUTABLE that cannot be executed is not a smaller feature, it
+            // is a broken one, and every readiness check downstream would
+            // report it as installed. So the bit is set deliberately.
+            //
+            // Two failures that must not be confused: an archive that shipped
+            // the file 0644 is this app correcting a packaging slip, and only
+            // a filesystem that refuses the bit is a real error.
+            if (!target.setExecutable(true, false) || !target.canExecute()) {
+                target.delete()
+                return InstallResult.Failed(
+                    "${artifact.id} was unpacked but this filesystem will not let it " +
+                        "be made executable — install it somewhere else or uninstall the agent"
+                )
+            }
+
+            ledger.markInstalled(artifact.id, listOf(relative), extracted.skipped)
+            staging.deleteRecursively()
+            InstallResult.Installed(1, extracted.skipped, extracted.bytesWritten)
+        } catch (e: Exception) {
+            InstallResult.Failed(
+                "Installing ${artifact.id} — ${e.message ?: "unknown error"}. " +
+                    "The verified bytes stay cached, so retrying re-unpacks without re-downloading."
+            )
+        }
     }
 
     /** An Ubuntu OCI root unpacks to roughly 3.5x; this caps a hostile one. */

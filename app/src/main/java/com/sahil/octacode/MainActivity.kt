@@ -153,6 +153,10 @@ private fun OctaScaffold() {
                     scope.launch { drawerState.close() }
                     goTo(Routes.WORKSPACES)
                 },
+                onOpenAgents = {
+                    scope.launch { drawerState.close() }
+                    goTo(Routes.AGENTS)
+                },
                 onOpenSettings = {
                     scope.launch { drawerState.close() }
                     goTo(Routes.SETTINGS)

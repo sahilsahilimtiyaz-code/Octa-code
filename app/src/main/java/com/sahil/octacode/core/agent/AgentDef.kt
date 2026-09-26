@@ -21,6 +21,25 @@ data class AgentDef(
     val endpoint: String? = null,
     /** Why this agent cannot be selected yet. Null = selectable. */
     val blockedReason: String? = null,
+    /**
+     * The command that starts this agent inside the guest, or null when this
+     * build has no way to start it.
+     *
+     * Null is the load-bearing part. An agent that is merely present on disk is
+     * a file, and a screen that offers it without a way to run it is the
+     * affordance that does nothing. Whoever fills this in is asserting that a
+     * real command will execute, so it is set only once the runtime that can
+     * execute it is verified.
+     */
+    val command: String? = null,
+    /** How much the install costs, so the fix can be quoted rather than implied. */
+    val downloadBytes: Long = 0L
 ) {
     val isSelectable: Boolean get() = isEnabled && blockedReason == null
+
+    /**
+     * True when this build can actually start the agent: installed, unblocked,
+     * and with a command to run.
+     */
+    val isLaunchable: Boolean get() = isSelectable && command != null
 }

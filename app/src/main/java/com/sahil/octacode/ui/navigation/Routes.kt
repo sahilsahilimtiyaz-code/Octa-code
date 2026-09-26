@@ -7,7 +7,18 @@ object Routes {
     const val HOME = "home"
     const val CHAT = "chat"
     const val PROJECTS = "projects"
-    const val TERMINAL = "terminal"
+    // The terminal can be opened already pointed at one userland. An agent row
+    // knows which userland its binary needs, so it can say so by arriving
+    // there rather than leaving the user to work out which chip to press.
+    // The argument has a default, so the bare route still resolves.
+    const val TERMINAL = "terminal?userland={userland}"
+    const val ARG_TERMINAL_USERLAND = "userland"
+    const val DEFAULT_TERMINAL_USERLAND = "termux"
+
+    fun terminal(userland: String = DEFAULT_TERMINAL_USERLAND): String =
+        "terminal?userland=$userland"
+
+    const val AGENTS = "agents"
     const val SETTINGS = "settings"
     const val RUNTIME = "runtime"
 

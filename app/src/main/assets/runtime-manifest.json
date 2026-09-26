@@ -1299,8 +1299,27 @@
           "provides": []
         }
       ]
+    },
+    {
+      "id": "opencode",
+      "title": "OpenCode",
+      "description": "Terminal coding agent \u2014 needs the glibc userland, because its binary is a glibc Linux build",
+      "optional": true,
+      "totalBytes": 60418875,
+      "items": [
+        {
+          "id": "opencode",
+          "version": "1.18.32",
+          "size": 60418875,
+          "sha256": "568461b7d4d8c19865c97e9a1102e613049c6039d01fe772154de873c1865840",
+          "path": "opencode-linux-arm64.tar.gz",
+          "url": "https://github.com/anomalyco/opencode/releases/download/v1.18.32/opencode-linux-arm64.tar.gz",
+          "kind": "EXECUTABLE",
+          "provides": []
+        }
+      ]
     }
   ],
-  "unionBytes": 294076500,
-  "packageCount": 79
+  "unionBytes": 354495375,
+  "packageCount": 80
 }

@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.SmartToy
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -54,16 +55,18 @@ private const val RECENT_LIMIT = 5
  * inert and say why during a response rather than swallowing the tap — a
  * silently ignored row is the decorative affordance this app does not ship.
  *
- * Agents are deliberately absent. [com.sahil.octacode.core.agent.AgentDef]
- * is a model with no registry behind it yet, so there is nothing for a row
- * to open; a section advertising the category would offer an option that
- * cannot be taken.
+ * Agents used to be absent for the same reason, and for the same stated
+ * reason: [com.sahil.octacode.core.agent.AgentDef] was a model with no
+ * registry behind it, so a section advertising the category would have
+ * offered an option that could not be taken. There is a registry now, and
+ * every row it produces is either launchable or says what is missing.
  */
 @Composable
 fun OctaDrawer(
     onOpenSession: (String) -> Unit,
     onOpenProjects: () -> Unit,
     onOpenWorkspaces: () -> Unit,
+    onOpenAgents: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenManageChats: () -> Unit,
     modifier: Modifier = Modifier,
@@ -181,6 +184,11 @@ fun OctaDrawer(
                 title = "Workspaces",
                 icon = Icons.Outlined.FolderOpen,
                 onClick = onOpenWorkspaces,
+            )
+            DrawerNavRow(
+                title = "Agents",
+                icon = Icons.Outlined.SmartToy,
+                onClick = onOpenAgents,
             )
             DrawerNavRow(
                 title = "Settings",

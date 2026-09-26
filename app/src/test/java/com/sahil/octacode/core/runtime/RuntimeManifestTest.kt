@@ -3,6 +3,7 @@ package com.sahil.octacode.core.runtime
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -58,6 +59,27 @@ class RuntimeManifestTest {
                     assertTrue("${artifact.id}: not a deb path", artifact.path.endsWith(".deb"))
                     assertTrue("${artifact.id}: path must stay under pool/", artifact.path.startsWith("pool/"))
                 }
+                RuntimeArtifact.Kind.EXECUTABLE -> {
+                    val url = artifact.url
+                    assertTrue("${artifact.id}: an agent must name its own url", url != null)
+                    assertTrue("${artifact.id}: agent url must be https", url!!.startsWith("https://"))
+                    assertTrue(
+                        "${artifact.id}: agent url must not be built from the Termux base",
+                        !url.startsWith(manifest.baseUrl)
+                    )
+                    // A versioned release URL, never "latest": "latest" would
+                    // point at a different archive tomorrow while the pin
+                    // still named these bytes, so every fetch would fail the
+                    // hash check for no reason the user could see.
+                    assertFalse(
+                        "${artifact.id}: must pin a version, not latest: $url",
+                        url.contains("/releases/latest/")
+                    )
+                    assertTrue(
+                        "${artifact.id}: the url must carry the pinned version: $url",
+                        url.contains("/download/v${artifact.version}/")
+                    )
+                }
                 RuntimeArtifact.Kind.ROOTFS -> {
                     val url = artifact.url
                     assertTrue("${artifact.id}: a rootfs must name its own url", url != null)
@@ -100,12 +122,17 @@ class RuntimeManifestTest {
         manifest.distinctArtifacts()
             .filter { it.kind == RuntimeArtifact.Kind.DEB }
             .forEach { assertTrue("${it.id}: ${it.cacheName}", it.cacheName.endsWith(".deb")) }
+        manifest.distinctArtifacts()
+            .filter { it.kind == RuntimeArtifact.Kind.EXECUTABLE }
+            .forEach { assertTrue("${it.id}: ${it.cacheName}", it.cacheName.endsWith(".tar.gz")) }
     }
 
     @Test
     fun `groups cover the requested runtime with self contained closures`() {
         assertEquals(
-            listOf("base", "proot", "node", "python", "devtools", "rust", "glibc"),
+            listOf(
+                "base", "proot", "node", "python", "devtools", "rust", "glibc", "opencode"
+            ),
             manifest.groups.map { it.id }
         )
 
@@ -116,6 +143,7 @@ class RuntimeManifestTest {
         assertTrue(manifest.group("python")!!.items.any { it.id == "python" })
         assertTrue(manifest.group("devtools")!!.items.any { it.id == "git" })
         assertTrue(manifest.group("glibc")!!.items.any { it.id == "glibc-rootfs" })
+        assertTrue(manifest.group("opencode")!!.items.any { it.id == "opencode" })
 
         // Every group but the glibc root filesystem is part of the default
         // install. Rust was promoted in, so "optional" now has to mean
@@ -123,7 +151,7 @@ class RuntimeManifestTest {
         // runtime needs, and it is opt-in rather than quietly added to the
         // one-tap button's bill.
         assertEquals(
-            listOf(false, false, false, false, false, false, true),
+            listOf(false, false, false, false, false, false, true, true),
             manifest.groups.map { it.optional }
         )
     }
@@ -134,10 +162,11 @@ class RuntimeManifestTest {
         val defaults = manifest.defaultArtifacts()
 
         assertFalse("the glibc rootfs must not be in the default set", defaults.any { it.id == "glibc-rootfs" })
+        assertFalse("nor the agent", defaults.any { it.id == "opencode" })
         // Everything that is not optional is, and the two sets differ by
         // exactly the optional artifacts.
         val optionalOnly = manifest.distinctArtifacts().map { it.id } - defaults.map { it.id }
-        assertEquals(setOf("glibc-rootfs"), optionalOnly.toSet())
+        assertEquals(setOf("glibc-rootfs", "opencode"), optionalOnly.toSet())
         assertTrue("the glibc group is not free: ${glibc.totalBytes}", glibc.totalBytes > 0)
     }
 
@@ -162,6 +191,20 @@ class RuntimeManifestTest {
         assertTrue(manifest.supportsDevice("arm64-v8a"))
         assertFalse(manifest.supportsDevice("armeabi-v7a"))
         assertTrue("unknown ABI should not hard-block", manifest.supportsDevice(""))
+    }
+
+    @Test
+    fun `an agent is a guest executable, and says where it goes`() {
+        val agent = manifest.group("opencode")!!.items.single()
+        assertEquals(RuntimeArtifact.Kind.EXECUTABLE, agent.kind)
+        assertEquals("usr/local/bin/opencode", agent.guestCommandPath)
+        assertTrue(
+            "must land somewhere on the guest PATH",
+            com.sahil.octacode.core.shell.ProotRunner.GUEST_PATH.contains("/usr/local/bin")
+        )
+        // A .deb has no place in the guest, and claiming one would send the
+        // installer looking for a path no package will ever occupy.
+        assertNull(manifest.group("base")!!.items.first().guestCommandPath)
     }
 
     @Test

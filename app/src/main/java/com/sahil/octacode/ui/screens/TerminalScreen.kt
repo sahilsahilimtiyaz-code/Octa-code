@@ -67,16 +67,32 @@ enum class ShellTarget(val title: String) {
  * are read concurrently to avoid pipe deadlock, so a command writing to both
  * will have its stderr collected after its stdout. The exit code is exact.
  */
+/**
+ * Which userland a route asked for.
+ *
+ * Unknown values fall back to Termux rather than being honoured: it is the one
+ * that works without the optional glibc install, so a malformed argument
+ * lands somewhere usable instead of on a screen that says "not installed".
+ */
+internal fun shellTargetFor(userland: String): ShellTarget =
+    if (userland.equals("glibc", ignoreCase = true)) ShellTarget.GLIBC else ShellTarget.TERMUX
+
 @Composable
 fun TerminalScreen(
     onOpenRuntime: () -> Unit = {},
+    initialUserland: String = ShellTarget.TERMUX.title,
     shell: PrefixShell = koinInject(),
     proot: ProotRunner = koinInject(),
 ) {
     var input by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var lines by remember { mutableStateOf<List<String>>(emptyList()) }
-    var target by remember { mutableStateOf(ShellTarget.TERMUX) }
+    // Keyed on the argument, so arriving from an agent row re-points the
+    // terminal at the userland that agent needs rather than keeping whatever
+    // the user last looked at.
+    var target by remember(initialUserland) {
+        mutableStateOf(shellTargetFor(initialUserland))
+    }
     val scope = rememberCoroutineScope()
 
     // Recomputed on every composition rather than remembered: installing the

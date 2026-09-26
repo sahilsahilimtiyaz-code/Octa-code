@@ -37,8 +37,16 @@ data class RuntimeArtifact(
     /** What these bytes are, which is what decides how they are unpacked. */
     val kind: Kind = Kind.DEB
 ) {
-    /** A Termux package to unwrap into the prefix, or a complete root filesystem. */
-    enum class Kind { DEB, ROOTFS }
+    /**
+     * What these bytes are, which is what decides how they are unpacked.
+     *
+     * The three are not interchangeable: a .deb wants a Termux prefix stripped
+     * and relocated into the bionic prefix, a root filesystem is already laid
+     * out and must stay whole, and an executable is a single file that belongs
+     * in the *guest* — a glibc binary dropped into the bionic prefix would be
+     * a 60 MB file that cannot run anywhere.
+     */
+    enum class Kind { DEB, ROOTFS, EXECUTABLE }
 
     /** Local filename used in the on-device cache (versioned → upgrades don't collide). */
     val cacheName: String get() = "${id}_${version}.$extension"
@@ -60,6 +68,23 @@ data class RuntimeArtifact(
 
     /** Commands this package will make available once unpacked (plus its own id). */
     val commandNames: List<String> get() = (listOf(id) + provides).distinct()
+
+    /**
+     * Where this artifact's command lives inside the glibc guest, or null if
+     * it is not a guest executable.
+     *
+     * `/usr/local/bin` rather than `/usr/bin`: the root filesystem's own
+     * binaries belong to the release that shipped them, and writing into it
+     * would make an upgraded image a tree assembled from two different ones.
+     * It is on the guest PATH, so the result runs by name.
+     */
+    val guestCommandPath: String?
+        get() = if (kind == Kind.EXECUTABLE) "$GUEST_BIN_DIR/$id" else null
+
+    companion object {
+        /** Must match the guest PATH built by the proot runner. */
+        const val GUEST_BIN_DIR = "usr/local/bin"
+    }
 }
 
 /**

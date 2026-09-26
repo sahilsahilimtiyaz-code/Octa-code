@@ -6,6 +6,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.sahil.octacode.ui.screens.AgentsScreen
 import com.sahil.octacode.ui.screens.ChatScreen
 import com.sahil.octacode.ui.screens.HomeScreen
 import com.sahil.octacode.ui.screens.MissionDetailScreen
@@ -59,10 +60,35 @@ fun OctaNavGraph(
         composable(Routes.WORKSPACES) {
             WorkspacesScreen(onBack = { navController.popBackStack() })
         }
-        composable(Routes.TERMINAL) {
+        composable(
+            route = Routes.TERMINAL,
+            arguments = listOf(
+                navArgument(Routes.ARG_TERMINAL_USERLAND) {
+                    type = NavType.StringType
+                    defaultValue = Routes.DEFAULT_TERMINAL_USERLAND
+                }
+            )
+        ) { entry ->
             // The not-installed state on this screen offers this route, so it
             // has to actually lead somewhere that can install the runtime.
-            TerminalScreen(onOpenRuntime = { navController.navigate(Routes.RUNTIME) })
+            TerminalScreen(
+                onOpenRuntime = { navController.navigate(Routes.RUNTIME) },
+                initialUserland = entry.arguments
+                    ?.getString(Routes.ARG_TERMINAL_USERLAND)
+                    .orEmpty()
+            )
+        }
+        composable(Routes.AGENTS) {
+            AgentsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenRuntime = { navController.navigate(Routes.RUNTIME) },
+                // Arrives in the userland the agent actually needs, rather
+                // than dropping the user on the Termux one and leaving them
+                // to guess which chip to press.
+                onOpenInTerminal = { userland ->
+                    navController.navigate(Routes.terminal(userland))
+                }
+            )
         }
         composable(Routes.SETTINGS) {
             SettingsScreen(

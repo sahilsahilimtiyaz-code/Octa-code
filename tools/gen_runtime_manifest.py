@@ -22,6 +22,7 @@ Design notes:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import sys
@@ -64,6 +65,31 @@ GLIBC_ROOTFS = {
 
 GLIBC_SUMS_URL = ("https://partner-images.canonical.com/oci/noble/20260924/"
                   "SHA256SUMS")
+
+# OpenCode, the first agent this app can install.
+#
+# It is a glibc aarch64 ELF that requests /lib/ld-linux-aarch64.so.1, which
+# is precisely the loader the root filesystem above provides — that is why
+# these two pins belong in the same manifest and cannot be reordered.
+#
+# THE PROVENANCE IS WEAKER THAN THE REST OF THIS FILE, and the difference
+# matters. Canonical publishes a SHA256SUMS beside its image, so
+# verify_glibc_pin() below checks our pin against the publisher's own. The
+# OpenCode release publishes no checksum file for its assets. This SHA-256 was
+# taken by downloading the asset and hashing it here — so the pin means "these
+# are the bytes we approved", not "the publisher agrees with us". Re-verify
+# with --verify-hashes whenever the version is bumped.
+OPENCODE = {
+    "id": "opencode",
+    "version": "1.18.32",
+    "size": 60418875,
+    "sha256": "568461b7d4d8c19865c97e9a1102e613049c6039d01fe772154de873c1865840",
+    "path": "opencode-linux-arm64.tar.gz",
+    "url": ("https://github.com/anomalyco/opencode/releases/download/v1.18.32/"
+            "opencode-linux-arm64.tar.gz"),
+    "kind": "EXECUTABLE",
+    "provides": [],
+}
 
 # id, title, description, seeds, optional
 GROUPS = [
@@ -174,7 +200,64 @@ def verify_glibc_pin() -> None:
     print(f"  glibc pin verified against {GLIBC_SUMS_URL}", file=sys.stderr)
 
 
-def build() -> dict:
+def head_size(url: str):
+    """Content-Length of a URL, or None when the host will not say.
+
+    GitHub's release CDN redirects and does not always report a length on a
+    HEAD, so a None here means "could not check", never "size is wrong".
+    """
+    request = urllib.request.Request(url, method="HEAD")
+    request.add_header("User-Agent", "octa-runtime-manifest")
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            return int(response.headers.get("Content-Length") or 0) or None
+    except Exception:  # a check that cannot run is not a failure
+        return None
+
+
+def verify_agent_pin(artifact: dict, deep: bool) -> None:
+    """Check the agent pin as hard as this publisher allows.
+
+    A full re-hash is the only real verification here, because the release
+    ships no checksum to compare against — so it is opt-in via --verify-hashes
+    rather than silently skipped, and a version bump should always use it.
+    Without that flag this confirms the asset is still published at the
+    pinned size, which catches a moved or withdrawn release and nothing more.
+    """
+    url = artifact["url"]
+    if deep:
+        print(f"  re-hashing {artifact['id']} "
+              f"({artifact['size'] / 1e6:.1f} MB)", file=sys.stderr)
+        digest = hashlib.sha256()
+        request = urllib.request.Request(
+            url, headers={"User-Agent": "octa-runtime-manifest"})
+        with urllib.request.urlopen(request, timeout=900) as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(chunk)
+        if digest.hexdigest() != artifact["sha256"]:
+            raise SystemExit(
+                f"{artifact['id']} pin is stale\n"
+                f"  pinned:    {artifact['sha256']}\n"
+                f"  re-hashed: {digest.hexdigest()}"
+            )
+        print(f"  {artifact['id']} pin re-verified from the bytes",
+              file=sys.stderr)
+        return
+
+    size = head_size(url)
+    if size is not None and size != artifact["size"]:
+        raise SystemExit(
+            f"{artifact['id']} size changed\n"
+            f"  pinned: {artifact['size']}\n"
+            f"  served: {size}\n"
+            f"  re-run with --verify-hashes and update the pin deliberately"
+        )
+    print(f"  {artifact['id']} release still published"
+          + (f" at {size} bytes" if size else " (size not reported)")
+          + " — pass --verify-hashes to re-hash", file=sys.stderr)
+
+
+def build(deep_verify: bool = False) -> dict:
     print(f"fetching {INDEX_URL}", file=sys.stderr)
     records = parse_index(fetch(INDEX_URL))
 
@@ -226,6 +309,22 @@ def build() -> dict:
     print(f"  {'glibc':9s} {1:3d} pkg(s) {GLIBC_ROOTFS['size']/1e6:8.1f} MB",
           file=sys.stderr)
 
+    verify_agent_pin(OPENCODE, deep_verify)
+
+    groups.append({
+        "id": "opencode",
+        "title": "OpenCode",
+        "description": ("Terminal coding agent — needs the glibc userland, "
+                        "because its binary is a glibc Linux build"),
+        # Optional twice over: it is a specific tool rather than part of any
+        # runtime, and it is useless without the optional glibc userland.
+        "optional": True,
+        "totalBytes": OPENCODE["size"],
+        "items": [dict(OPENCODE)],
+    })
+    print(f"  {'opencode':9s} {1:3d} pkg(s) {OPENCODE['size']/1e6:8.1f} MB",
+          file=sys.stderr)
+
     union = {i["id"]: i for g in groups for i in g["items"]}
     return {
         "schema": 1,
@@ -244,9 +343,12 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true",
                         help="verify the committed asset matches a fresh build")
+    parser.add_argument("--verify-hashes", action="store_true",
+                        help="re-download and re-hash the agent assets (60 MB) "
+                             "instead of only checking they are still published")
     args = parser.parse_args()
 
-    payload = build()
+    payload = build(deep_verify=args.verify_hashes)
 
     out = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                        "app", "src", "main", "assets", "runtime-manifest.json")
