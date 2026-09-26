@@ -5,8 +5,10 @@ import com.sahil.octacode.core.provider.AiProvider
 import com.sahil.octacode.core.provider.ProviderId
 import com.sahil.octacode.data.model.DefaultFetchedModelsRepository
 import com.sahil.octacode.data.net.KtorHttpFactory
+import com.sahil.octacode.data.providers.AnthropicAdapter
 import com.sahil.octacode.data.providers.CustomEndpointAdapter
 import com.sahil.octacode.data.providers.DefaultCapabilityRegistry
+import com.sahil.octacode.data.providers.GeminiAdapter
 import com.sahil.octacode.data.providers.OpenAiAdapter
 import com.sahil.octacode.data.providers.namedProviderAdapters
 import com.sahil.octacode.data.security.CredentialStore
@@ -32,14 +34,30 @@ val appModule = module {
     single<CustomEndpointAdapter> { CustomEndpointAdapter(get(), get()) }
 
     single<Map<ProviderId, AiProvider>> {
+        val credentials = get<CredentialStore>()
         // Two bespoke adapters plus every provider that speaks the OpenAI
         // protocol (DeepSeek, Groq, Mistral, xAI, OpenRouter) — one shared
         // class each, differing only in base URL and key slot.
+        //
+        // Claude and Gemini take the same shape as OpenAI's: a class of their
+        // own, because their protocols differ from OpenAI's in the path, the
+        // auth header and the roles — not because they are special cases to be
+        // held out of the map. The key arrives as a lambda for the reason
+        // every other adapter uses one: `validate()` must be able to report
+        // "no key" without an Android Context, and this project has no
+        // Robolectric.
         mapOf<ProviderId, AiProvider>(
             ProviderId.OPENAI to get<OpenAiAdapter>(),
-            ProviderId.CUSTOM to get<CustomEndpointAdapter>()
-        ) + namedProviderAdapters(get<HttpClient>(), get<CredentialStore>())
-        // CLAUDE / GEMINI still absent → the registry reports them Unavailable.
+            ProviderId.CUSTOM to get<CustomEndpointAdapter>(),
+            ProviderId.CLAUDE to AnthropicAdapter(get<HttpClient>()) {
+                credentials.getApiKey(ProviderId.CLAUDE)
+            },
+            ProviderId.GEMINI to GeminiAdapter(get<HttpClient>()) {
+                credentials.getApiKey(ProviderId.GEMINI)
+            },
+        ) + namedProviderAdapters(get<HttpClient>(), credentials)
+        // Every entry of ProviderId is now backed by an adapter; a future one
+        // that is not falls through to the registry's "no adapter registered".
     }
 
     single<CapabilityRegistry> { DefaultCapabilityRegistry(get()) }

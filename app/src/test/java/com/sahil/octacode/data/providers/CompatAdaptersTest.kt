@@ -2,6 +2,7 @@ package com.sahil.octacode.data.providers
 
 import com.sahil.octacode.core.provider.ProviderId
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -79,7 +80,13 @@ class CompatAdaptersTest {
             "OpenRouter key detected — paste it into OpenRouter instead of OpenAI",
             foreignProviderHint("sk-or-v1-abcdef123456")
         )
-        assertTrue(foreignProviderHint("sk-ant-api03-xyz")!!.contains("Anthropic"))
+        // Claude and Gemini used to have wording of their own claiming they
+        // were "not implemented in this build". They have adapters now, so the
+        // one unified sentence is the only thing that can be true — and it
+        // names the provider by its card title, like every other owner does.
+        val claudeHint = foreignProviderHint("sk-ant-api03-xyz")!!
+        assertTrue("was: $claudeHint", claudeHint.contains("Claude"))
+        assertFalse("still claims it is unimplemented: $claudeHint", claudeHint.contains("not implemented"))
         assertTrue(foreignProviderHint("AIzaSyExample")!!.contains("Gemini"))
     }
 

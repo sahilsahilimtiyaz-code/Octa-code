@@ -60,16 +60,22 @@ class NamedProvidersTest {
     }
 
     @Test
-    fun `every provider is either adapter-backed or honestly reported unavailable`() {
+    fun `every provider is adapter-backed`() {
         // If someone adds an enum entry without wiring it, this fails — which
         // is the point: an unwired provider would otherwise surface as a row
         // in Settings that cannot be filled in, or as an endpoint in the
         // picker that never responds.
-        val wired = NAMED_PROVIDER_BASE_URLS.keys + setOf(ProviderId.OPENAI, ProviderId.CUSTOM)
-        assertEquals(
-            setOf(ProviderId.CLAUDE, ProviderId.GEMINI),
-            ProviderId.entries.toSet() - wired
+        //
+        // Claude and Gemini used to be the expected two. They have adapters of
+        // their own now, so the set is empty and any new gap is a failure
+        // again rather than the documented state.
+        val wired = NAMED_PROVIDER_BASE_URLS.keys + setOf(
+            ProviderId.OPENAI,
+            ProviderId.CUSTOM,
+            ProviderId.CLAUDE,
+            ProviderId.GEMINI,
         )
+        assertEquals(emptySet<ProviderId>(), ProviderId.entries.toSet() - wired)
     }
 
     @Test
@@ -148,9 +154,9 @@ class NamedProvidersTest {
     @Test
     fun `a named provider's default model is a real id, never the placeholder`() {
         // "default" is the app's own marker for "unset" and is rejected by every
-        // real server — CUSTOM/CLAUDE/GEMINI return it deliberately, the named
-        // providers must not, because theirs goes on the wire on the first send
-        // before the picker has ever been opened.
+        // real server — CUSTOM returns it deliberately, the named providers must
+        // not, because theirs goes on the wire on the first send before the
+        // picker has ever been opened.
         NAMED_PROVIDER_BASE_URLS.keys.forEach { id ->
             val model = defaultModelFor(id)
             assertTrue("$id defaulted to the placeholder", model != "default")
@@ -159,10 +165,24 @@ class NamedProvidersTest {
     }
 
     @Test
-    fun `providers without an adapter keep returning the unset placeholder`() {
-        listOf(ProviderId.CUSTOM, ProviderId.CLAUDE, ProviderId.GEMINI).forEach { id ->
-            assertEquals("default", defaultModelFor(id))
+    fun `only the custom endpoint keeps the unset placeholder`() {
+        // The placeholder is refused by every real server, so this is the one
+        // provider allowed to keep it: CUSTOM has no model of its own to name,
+        // and `resolveCustomModel` substitutes the model the user typed or
+        // refuses to send.
+        //
+        // Claude and Gemini returned "default" while they had no adapter. They
+        // do now, so their first send needs a real id — a placeholder would
+        // reach the API and earn an HTTP 400 the user could not interpret.
+        assertEquals("default", defaultModelFor(ProviderId.CUSTOM))
+
+        ProviderId.entries.filter { it != ProviderId.CUSTOM }.forEach { id ->
+            val model = defaultModelFor(id)
+            assertTrue("$id defaulted to the placeholder", model != "default")
+            assertTrue("$id defaulted to a blank model", model.isNotBlank())
         }
-        assertEquals("gpt-4o-mini", defaultModelFor(ProviderId.OPENAI))
+
+        assertEquals("claude-opus-5", defaultModelFor(ProviderId.CLAUDE))
+        assertEquals("gemini-3.7-flash", defaultModelFor(ProviderId.GEMINI))
     }
 }

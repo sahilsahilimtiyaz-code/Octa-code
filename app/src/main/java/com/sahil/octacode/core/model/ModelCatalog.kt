@@ -16,11 +16,19 @@ import com.sahil.octacode.core.provider.ProviderId
  * field whose own docs say guessing it produces "a number the UI presents as
  * fact", and we have not asked an endpoint.
  *
- * Only adapters whose model space we can state are represented. The custom
- * endpoint is omitted on purpose: what its server will accept is whatever the
- * user configured, so that entry is contributed at runtime from the stored
- * model instead of being guessed at here. Claude and Gemini are unavailable in
- * this build, so listing their models would offer rows that cannot be reached.
+ * Only OpenAI's model space is stated here. The remaining providers —
+ * DeepSeek, Groq, Mistral, xAI, OpenRouter, Claude, Gemini — are carried as
+ * *endpoints* instead: their first model comes from `ChatModelDefaults` and
+ * their full list from a fetch once a key is saved for them. The custom
+ * endpoint is omitted on purpose rather than by that pattern — what its server
+ * will accept is whatever the user configured, so nothing here can describe it
+ * and nothing is fetched for it either.
+ *
+ * Listing one set of providers but not the others is not an oversight, and it
+ * is not "Claude and Gemini are unavailable in this build" as an earlier note
+ * here claimed: those two have had real adapters since they could be reached.
+ * What would be wrong is claiming a bundled list is *complete* when half of
+ * the providers were never in it.
  */
 object ModelCatalog {
 

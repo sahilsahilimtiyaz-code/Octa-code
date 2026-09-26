@@ -4,7 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.sahil.octacode.core.model.ModelDef
 import com.sahil.octacode.core.provider.ProviderId
-import com.sahil.octacode.data.providers.MODEL_LIST_BASE_URLS
+import com.sahil.octacode.data.providers.MODEL_LIST_ENDPOINTS
 import com.sahil.octacode.data.providers.explainFetchFailure
 import com.sahil.octacode.data.providers.fetchModelIds
 import com.sahil.octacode.data.security.CredentialStore
@@ -41,7 +41,7 @@ class DefaultFetchedModelsRepository(
     override val models: StateFlow<List<ModelDef>> = _models.asStateFlow()
 
     override suspend fun refresh(provider: ProviderId): FetchResult {
-        val baseUrl = MODEL_LIST_BASE_URLS[provider]
+        val endpoint = MODEL_LIST_ENDPOINTS[provider]
             ?: return FetchResult(
                 succeeded = false,
                 message = "Nothing to fetch — this endpoint's model is the one you type in " +
@@ -54,7 +54,7 @@ class DefaultFetchedModelsRepository(
             ?: return FetchResult(false, "Save a ${provider.title} API key first.")
 
         val ids = try {
-            fetchModelIds(http, baseUrl, key)
+            fetchModelIds(http, endpoint, key)
         } catch (cancelled: CancellationException) {
             // Not a failure to report — the caller went away. Turning this
             // into a Failure would leave "Fetching…" on a screen whose

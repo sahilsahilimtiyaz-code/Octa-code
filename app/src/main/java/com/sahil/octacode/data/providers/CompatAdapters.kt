@@ -29,7 +29,14 @@ import kotlinx.serialization.Serializable
 internal data class ChatCompletionsWire(
     val model: String,
     val messages: List<WireMsg>,
-    val stream: Boolean = true,
+    // Required, with no default: `Json.encodeDefaults` is false for this app's
+    // client, so a property left at its default value is *not* serialized. A
+    // defaulted `stream = true` would therefore leave the field out of the
+    // body entirely, and OpenAI's own default for an absent `stream` is false
+    // — which answers with one JSON object instead of an SSE stream, and the
+    // parser downstream would read a non-event line and emit nothing. Making
+    // it required is what puts it on the wire.
+    val stream: Boolean,
     val max_tokens: Int,
     val temperature: Double
 )
@@ -60,6 +67,7 @@ internal fun openAiCompatibleStream(
     val body = ChatCompletionsWire(
         model = request.model,
         messages = request.messages.map { WireMsg(it.role.name.lowercase(), it.content) },
+        stream = true,
         max_tokens = request.maxTokens,
         temperature = request.temperature
     )
@@ -185,11 +193,11 @@ internal fun foreignProviderHint(key: String, target: ProviderId = ProviderId.OP
     // "This is a OpenRouter key", and the obvious vowel fix would have said
     // "a xAI key" — which is pronounced "ex-eye". "Key detected" reads
     // correctly for every name and is literally what happened.
-    return when (owner) {
-        ProviderId.CLAUDE -> "This is an Anthropic key — Claude is not implemented in this build"
-        ProviderId.GEMINI -> "This is a Google AI key — Gemini is not implemented in this build"
-        else -> "${owner.title} key detected — paste it into ${owner.title} instead of ${target.title}"
-    }
+    //
+    // Every owner takes the same branch, including Claude and Gemini: they
+    // used to have their own wording claiming they were not implemented in
+    // this build, which stopped being true when they gained adapters.
+    return "${owner.title} key detected — paste it into ${owner.title} instead of ${target.title}"
 }
 
 // Real OpenAI adapter: https://api.openai.com/v1 — key from CredentialStore.

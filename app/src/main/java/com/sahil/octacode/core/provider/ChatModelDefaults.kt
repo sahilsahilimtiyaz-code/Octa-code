@@ -7,14 +7,16 @@ package com.sahil.octacode.core.provider
 // returned "default" would ship the literal string "default" to a real endpoint
 // and earn HTTP 400 for no reason the user could see.
 //
-// Each id below is the one the vendor's own docs use in their chat-completions
-// example. They are a fallback, not the catalogue — M12.2 replaces this with
-// the provider's fetched list when a key is configured.
+// Each id below is the one the vendor's own docs use in their simplest example.
+// They are a fallback, not the catalogue: what the picker offers is the bundled
+// catalog plus whatever the provider listed for this key once one was saved.
 fun defaultModelFor(id: ProviderId): String = when (id) {
     ProviderId.OPENAI -> "gpt-4o-mini"
+    // Only CUSTOM has no model of its own to name — `resolveCustomModel` turns
+    // this placeholder into the one the user typed, or refuses to send.
     ProviderId.CUSTOM -> "default"
-    ProviderId.CLAUDE -> "default"
-    ProviderId.GEMINI -> "default"
+    ProviderId.CLAUDE -> "claude-opus-5"
+    ProviderId.GEMINI -> "gemini-3.7-flash"
     // deepseek-chat/reasoner were discontinued on 2026-07-24; the current
     // non-thinking model is deepseek-v4-flash.
     ProviderId.DEEPSEEK -> "deepseek-v4-flash"

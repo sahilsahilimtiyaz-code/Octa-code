@@ -150,8 +150,14 @@ fun explainFetchFailure(cause: Throwable, providerTitle: String): String = when 
             "$providerTitle will not let this key read its model list (HTTP 403). " +
                 "Check what the key is allowed to reach."
         404 ->
-            "$providerTitle has no model list at that address (HTTP 404). Check the " +
-                "base URL in Settings → Providers."
+            // Every URL that can produce this is set by this build: the custom
+            // endpoint has no list to fetch and is absent from the map, so no
+            // fetch failure is ever about a field the user filled in. Saying
+            // "check the base URL" sent readers to look for a control that
+            // does not exist — instead, state the fact and what still works.
+            "$providerTitle has no model list at that address (HTTP 404). Nothing " +
+                "you configured is involved: this build's address for it is fixed, " +
+                "and the list is optional — its default model still works without one."
         429 ->
             "$providerTitle is rate-limiting this key (HTTP 429). Wait a moment and " +
                 "try again."

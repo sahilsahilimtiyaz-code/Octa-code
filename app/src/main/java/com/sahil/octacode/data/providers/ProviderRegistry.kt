@@ -18,11 +18,11 @@ class DefaultCapabilityRegistry(
 
     override suspend fun providerStatus(id: ProviderId): ProviderStatus {
         val adapter = adapters[id] ?: return ProviderStatus.Unavailable(
-            when (id) {
-                ProviderId.CLAUDE -> "Claude adapter not implemented in M2"
-                ProviderId.GEMINI -> "Gemini adapter not implemented in M2"
-                else -> "No adapter registered for $id"
-            }
+            // Reachable only for a provider added to the enum without being
+            // wired. Every current entry has an adapter, so saying "not
+            // implemented in M2" here would be a version number attached to a
+            // state the app is no longer in.
+            "No adapter registered for $id"
         )
         return try {
             adapter.validate()

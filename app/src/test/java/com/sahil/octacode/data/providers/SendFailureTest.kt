@@ -205,15 +205,22 @@ class SendFailureTest {
     }
 
     @Test
-    fun `a 404 while listing points at the base url rather than at the model`() {
+    fun `a 404 while listing does not send the reader to a control that does not exist`() {
+        // Every URL that can produce this is set by this build — the custom
+        // endpoint has no list to fetch and never appears here. The earlier
+        // wording told readers to "check the base URL", a field only the
+        // custom endpoint has, which would have left them searching for
+        // something to correct and finding nothing. What still works is the
+        // fact worth giving them instead.
         val out = explainFetchFailure(
             ProviderHttpException(404, "HTTP 404 from https://wrong.example/v1"),
             "Mistral"
         )
 
         assertTrue("was: $out", out.contains("no model list"))
-        assertTrue("was: $out", out.contains("base URL"))
+        assertFalse("sent the reader to a field that is not there: $out", out.contains("base URL"))
         assertFalse("reached for a model: $out", out.contains("pick another model"))
+        assertTrue("should say what still works: $out", out.contains("default model"))
     }
 
     @Test
