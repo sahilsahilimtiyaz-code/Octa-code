@@ -1,6 +1,7 @@
 package com.sahil.octacode.core.runtime
 
 import java.io.File
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -33,7 +34,37 @@ class RuntimeProvisioner(
     private val installer: ArtifactInstaller,
     private val cacheDir: File
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    // CoroutineExceptionHandler, not just SupervisorJob: SupervisorJob only
+    // stops a failure cancelling SIBLINGS, it does not consume the exception.
+    // Without a handler every throw here — a ledger that cannot be written
+    // because storage is full, an unexpected I/O failure — reached Android's
+    // default uncaught handler and killed the process, which is why tapping
+    // Install could throw the user out of the app with nothing on screen.
+    // The handler turns that into the same visible, retryable error the
+    // deliberate failure paths already produce.
+    private val scope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO +
+            CoroutineExceptionHandler { _, throwable ->
+                _state.update { s ->
+                    s.copy(
+                        busy = false,
+                        activeGroupId = null,
+                        progress = null,
+                        lastError = ProvisionError(
+                            groupId = s.activeGroupId,
+                            itemId = null,
+                            reason = "Install stopped: " +
+                                (throwable.message?.takeIf { it.isNotBlank() }
+                                    ?: throwable::class.simpleName
+                                    ?: "unknown error") +
+                                ". Everything already verified is kept, so pressing " +
+                                "Install again resumes without re-downloading.",
+                            retryable = true
+                        )
+                    )
+                }
+            }
+    )
     private val _state = MutableStateFlow(ProvisionerState(fetched = ledger.snapshot()))
     val state: StateFlow<ProvisionerState> = _state.asStateFlow()
 

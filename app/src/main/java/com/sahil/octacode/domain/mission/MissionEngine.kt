@@ -7,12 +7,14 @@ import com.sahil.octacode.core.provider.AiProvider
 import com.sahil.octacode.core.provider.ProviderId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import java.util.UUID
@@ -88,7 +90,23 @@ class MissionEngine(
     private val _state = MutableStateFlow(MissionEngineState())
     val state: StateFlow<MissionEngineState> = _state
 
-    private val scope: CoroutineScope = scope ?: CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    // Backstop: without a CoroutineExceptionHandler an unexpected throw in the
+    // pipeline reached Android's default handler and killed the process. It
+    // now lands in lastError, which MissionDetailScreen already renders.
+    private val scope: CoroutineScope = scope ?: CoroutineScope(
+        SupervisorJob() + Dispatchers.Default +
+            CoroutineExceptionHandler { _, throwable ->
+                _state.update { s ->
+                    s.copy(
+                        busy = false,
+                        lastError = "Run stopped: " +
+                            (throwable.message?.takeIf { it.isNotBlank() }
+                                ?: throwable::class.simpleName
+                                ?: "unknown error")
+                    )
+                }
+            }
+    )
     private var runJob: Job? = null
     private var approval: CompletableDeferred<Boolean>? = null
 

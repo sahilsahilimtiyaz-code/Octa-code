@@ -15,6 +15,7 @@ import com.sahil.octacode.data.providers.ProviderHttpException
 import com.sahil.octacode.domain.model.ModelUserStateRepository
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -121,7 +122,28 @@ class ChatEngine(
     private val _state = MutableStateFlow(ChatEngineState())
     val state: StateFlow<ChatEngineState> = _state
 
-    private val scope: CoroutineScope = scope ?: CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    // Backstop for any path not already wrapped in its own try/catch. Without
+    // a handler the exception reaches Android's default uncaught handler and
+    // the process dies, so the user is ejected from the app instead of being
+    // told the send failed — which is exactly what "no error appears" looks
+    // like from the outside. ChatScreen renders lastError, so it goes there.
+    // A frozen streamingText would read as a finished answer that was never
+    // committed, so it is dropped along with the flag.
+    private val scope: CoroutineScope = scope ?: CoroutineScope(
+        SupervisorJob() + Dispatchers.Default +
+            CoroutineExceptionHandler { _, throwable ->
+                _state.update { s ->
+                    s.copy(
+                        busy = false,
+                        streamingText = null,
+                        lastError = "Send failed: " +
+                            (throwable.message?.takeIf { it.isNotBlank() }
+                                ?: throwable::class.simpleName
+                                ?: "unknown error")
+                    )
+                }
+            }
+    )
     private var streamJob: Job? = null
 
     /** Serialises writes so turns cannot land out of order. */

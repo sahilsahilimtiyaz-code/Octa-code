@@ -14,6 +14,7 @@ import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -319,5 +320,43 @@ class RuntimeProvisionerTest {
             final.fetched.size
         )
         assertFalse(cached("gamma").exists())
+    }
+
+    /**
+     * A failure nobody caught used to escape the queue entirely: with no
+     * CoroutineExceptionHandler on the scope it reached Android's default
+     * uncaught handler and killed the process. That is what "tapping Install
+     * throws you out of the app" looks like from the outside. It must instead
+     * become the same visible, retryable error the deliberate paths produce.
+     *
+     * The throw is induced the way it really happens in the field — the ledger
+     * writes a temp file and renames it, and a full or hostile filesystem makes
+     * that write fail from inside persist(), which nothing upstream wraps.
+     */
+    @Test
+    fun `an unexpected write failure surfaces as a retryable error instead of killing the app`() = runBlocking {
+        File(ledgerFile.parentFile, "${ledgerFile.name}.tmp").mkdirs()
+
+        val prov = newProvisioner(serve { path ->
+            when (fileName(path)) {
+                "alpha_1.0_aarch64.deb" -> Reply.Bytes(alpha)
+                "beta_1.0_aarch64.deb" -> Reply.Bytes(beta)
+                else -> Reply.Missing
+            }
+        })
+
+        prov.install("base")
+        // Waits for BOTH: the finally clears busy before the handler runs, so
+        // observing !busy alone would race the assertion. If no handler were
+        // installed this would time out rather than pass.
+        val final = withTimeout(30_000) {
+            prov.state.first { !it.busy && it.lastError != null }
+        }
+
+        val error = requireNotNull(final.lastError) { "expected a visible error" }
+        assertFalse("the queue must have stopped", final.busy)
+        assertTrue("reason was: ${error.reason}", error.reason.contains("Install stopped"))
+        assertTrue("should tell the user how to recover: ${error.reason}", error.reason.contains("Install again"))
+        assertTrue("the failure must be retryable", error.retryable)
     }
 }
